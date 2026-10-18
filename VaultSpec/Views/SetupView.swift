@@ -1,0 +1,119 @@
+import SwiftUI
+
+/// First launch: create the vault password.
+struct SetupView: View {
+    @Environment(VaultStore.self) private var vault
+    @State private var password = ""
+    @State private var confirmation = ""
+    @State private var enableBiometrics = true
+    @State private var error: String?
+    @State private var working = false
+    @State private var showingRestore = false
+    @FocusState private var focused: Field?
+
+    private enum Field { case password, confirmation }
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    var body: some View {
+        CenteredScroll {
+            AdaptiveStack(spacing: 28) {
+                VStack(spacing: 14) {
+                    LogoMark().frame(width: 76, height: 76)
+                    Text("Create Your Vault")
+                        .font(.largeTitle.weight(.bold))
+                    Text("Your vault password encrypts every code on this device. It is never stored or sent anywhere.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+
+                VStack(spacing: 20) {
+                    fields
+
+                    if let error {
+                        Text(error).font(.footnote).foregroundStyle(.red)
+                    }
+
+                    Button(action: create) {
+                        Group {
+                            if working { ProgressView() } else { Text("Create Vault").fontWeight(.semibold) }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(working)
+
+                    Text("At least \(VaultStore.minimumPasswordLength) characters. If you forget it, the vault cannot be recovered.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    Button("Restore from VaultSpec Cloud", systemImage: "arrow.down.circle") { showingRestore = true }
+                        .buttonStyle(.glass)
+                        .controlSize(.large)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(24)
+            .frame(maxWidth: verticalSizeClass == .compact ? 880 : 520)
+        }
+        .sheet(isPresented: $showingRestore) { CloudRestoreView(mode: .newVault) }
+    }
+
+    private var fields: some View {
+        GlassEffectContainer {
+            VStack(spacing: 14) {
+                VStack(spacing: 0) {
+                    SecureField("Vault password", text: $password)
+                        .textContentType(.newPassword)
+                        .focused($focused, equals: .password)
+                        .submitLabel(.next)
+                        .onSubmit { focused = .confirmation }
+                        .padding(18)
+                    Divider().padding(.leading, 18)
+                    SecureField("Confirm password", text: $confirmation)
+                        .textContentType(.newPassword)
+                        .focused($focused, equals: .confirmation)
+                        .submitLabel(.go)
+                        .onSubmit(create)
+                        .padding(18)
+                }
+                .glassEffect(.regular, in: .rect(cornerRadius: 24))
+
+                if let biometry = vault.biometryName {
+                    Toggle(isOn: $enableBiometrics) {
+                        Label("Unlock with \(biometry)", systemImage: vault.biometrySymbol)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 24))
+                }
+            }
+        }
+    }
+
+    private func create() {
+        error = nil
+        guard password.count >= VaultStore.minimumPasswordLength else {
+            error = VaultStore.VaultError.passwordTooShort.localizedDescription
+            return
+        }
+        guard password == confirmation else {
+            error = "The passwords don't match."
+            return
+        }
+        working = true
+        Task {
+            do {
+                try await vault.setUp(password: password, enableBiometrics: enableBiometrics && vault.biometryName != nil)
+            } catch {
+                self.error = error.localizedDescription
+            }
+            working = false
+        }
+    }
+}
