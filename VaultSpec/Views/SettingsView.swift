@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var showingPassword = false
     @State private var confirmingErase = false
     @State private var cloudSheet: CloudSheet?
+    @State private var confirmingSignOut = false
     @State private var error: String?
 
     private var version: String {
@@ -34,7 +35,9 @@ struct SettingsView: View {
                     }
                 }
 
-                CloudBackupSection(sheet: $cloudSheet)
+                BehaviorSection()
+
+                CloudBackupSection(sheet: $cloudSheet, confirmingSignOut: $confirmingSignOut)
 
                 Section {
                     LabeledContent("Accounts", value: "\(vault.accounts.count)")
@@ -76,6 +79,13 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingPassword) { ChangePasswordView() }
             .sheet(item: $cloudSheet) { CloudBackupSection.content(for: $0, cloud: cloud) }
+            .confirmationDialog("Sign out of VaultSpec Cloud?", isPresented: $confirmingSignOut, titleVisibility: .visible) {
+                Button("Sign Out", role: .destructive) {
+                    Task { await cloud.signOut() }
+                }
+            } message: {
+                Text("This device stops backing up. Backups already in your account stay there.")
+            }
             .confirmationDialog("Erase this vault?", isPresented: $confirmingErase, titleVisibility: .visible) {
                 Button("Erase Vault", role: .destructive) {
                     dismiss()
@@ -91,6 +101,7 @@ struct SettingsView: View {
 
 private struct ChangePasswordView: View {
     @Environment(VaultStore.self) private var vault
+    @Environment(AppSettings.self) private var settings
     @Environment(CloudStore.self) private var cloud
     @Environment(\.dismiss) private var dismiss
     @State private var password = ""
@@ -135,6 +146,7 @@ private struct ChangePasswordView: View {
         Task {
             do {
                 try await vault.changePassword(to: password)
+                settings.recordPasswordEntry()
                 // Cloud backups move to the new password; the server then drops the old ones
                 await cloud.vaultPasswordChanged(to: password, accounts: vault.accounts)
                 dismiss()

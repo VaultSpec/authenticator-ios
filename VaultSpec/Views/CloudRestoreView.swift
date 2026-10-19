@@ -10,6 +10,7 @@ struct CloudRestoreView: View {
 
     @Environment(CloudStore.self) private var cloud
     @Environment(VaultStore.self) private var vault
+    @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
 
     private enum Remote {
@@ -159,6 +160,7 @@ struct CloudRestoreView: View {
                         restoring: true
                     )
                     try vault.importAccounts(accounts)
+                    settings.recordPasswordEntry()
                     try? await cloud.adopt(vaultPassword: password)
                     dismiss()
                 case .merge:

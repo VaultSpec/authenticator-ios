@@ -228,13 +228,16 @@ extension VaultStore {
             state = .unlocked
         }
         let samples: [(String, String, String)] = [
-            ("Google", "alex@example.com", "Personal"),
+            ("AWS", "alex@northwind.io", "Work"),
             ("GitHub", "alex-dev", "Work"),
+            ("Okta", "alex@northwind.io", "Work"),
+            ("Google Workspace", "alex@northwind.io", "Work"),
+            ("Microsoft 365", "alex@northwind.io", "Work"),
+            ("Cloudflare", "alex@northwind.io", "Work"),
+            ("Stripe", "finance@northwind.io", "Work"),
+            ("Slack", "alex@northwind.io", "Work"),
+            ("Google", "alex@example.com", "Personal"),
             ("Proton", "alex@proton.me", "Personal"),
-            ("Discord", "alex", "Social"),
-            ("Spotify", "alex@example.com", "Personal"),
-            ("Notion", "alex@example.com", "Work"),
-            ("Stripe", "alex@example.com", "Work"),
         ]
         for (issuer, name, category) in samples {
             try? add(Account(issuer: issuer, name: name, secret: Base32.encode(VaultCrypto.randomBytes(20)), category: category))

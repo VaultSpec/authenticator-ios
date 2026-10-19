@@ -4,12 +4,14 @@ import SwiftUI
 struct VaultSpecApp: App {
     @State private var vault = VaultStore()
     @State private var cloud = CloudStore()
+    @State private var settings = AppSettings()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(vault)
                 .environment(cloud)
+                .environment(settings)
                 #if DEBUG
                 .task {
                     await vault.seedDemoIfRequested()

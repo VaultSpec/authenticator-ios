@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import VaultSpec
 
@@ -106,5 +107,57 @@ struct VaultCryptoTests {
         let key = try VaultCrypto.deriveKey(password: "password", salt: Data("salt".utf8), rounds: 1)
         let hex = key.withUnsafeBytes { Data($0) }.map { String(format: "%02x", $0) }.joined()
         #expect(hex == "120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b")
+    }
+}
+
+struct AppSettingsTests {
+    private func fresh() -> AppSettings {
+        let defaults = UserDefaults(suiteName: "settings-tests")!
+        defaults.removePersistentDomain(forName: "settings-tests")
+        return AppSettings(defaults: defaults)
+    }
+
+    @Test func defaultsMatchAndroid() {
+        let settings = fresh()
+        #expect(!settings.allowScreenshots && !settings.tapToReveal && !settings.highlightOnTap)
+        #expect(settings.tapToCopy) // iOS has always copied on tap
+        #expect(settings.passwordReminderDays == 15 && settings.revealSeconds == 30)
+    }
+
+    @Test func passwordReminder() {
+        let settings = fresh()
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        #expect(!settings.isPasswordReminderDue(at: start)) // never entered: not due, as on Android
+        settings.recordPasswordEntry(at: start)
+        #expect(!settings.isPasswordReminderDue(at: start.addingTimeInterval(14 * 86_400)))
+        #expect(settings.isPasswordReminderDue(at: start.addingTimeInterval(16 * 86_400)))
+        settings.passwordReminderDays = 30
+        #expect(!settings.isPasswordReminderDue(at: start.addingTimeInterval(16 * 86_400)))
+    }
+
+    @Test func settingsPersist() {
+        let defaults = UserDefaults(suiteName: "settings-persist")!
+        defaults.removePersistentDomain(forName: "settings-persist")
+        let first = AppSettings(defaults: defaults)
+        first.tapToReveal = true
+        first.passwordReminderDays = 7
+        let second = AppSettings(defaults: defaults)
+        #expect(second.tapToReveal && second.passwordReminderDays == 7)
+    }
+}
+
+struct ScreenshotShieldTests {
+    /// iOS marks a secure text field's canvas layer to be skipped by screenshots and recordings.
+    /// This reads that private flag (tests only) so an iOS change that breaks the shield shows up here.
+    @Test func shieldContentIsInTheSecureLayer() throws {
+        let view = ShieldView(content: AnyView(Text("123 456")))
+        let container = try #require(view.subviews.first)
+        #expect(String(describing: type(of: container)).contains("Canvas"))
+
+        let flag = { (container.layer.value(forKey: "disableUpdateMask") as? NSNumber)?.intValue ?? 0 }
+        view.setProtected(true)
+        #expect(flag() != 0)
+        view.setProtected(false)
+        #expect(flag() == 0)
     }
 }

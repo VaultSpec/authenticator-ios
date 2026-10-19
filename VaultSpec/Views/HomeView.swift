@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 /// The unlocked vault: search, category filter and a list of glass account cards.
 struct HomeView: View {
     @Environment(VaultStore.self) private var vault
+    @Environment(AppSettings.self) private var settings
     @State private var search = ""
     @State private var category = Account.defaultCategory
     @State private var showingAdd = false
@@ -11,6 +12,9 @@ struct HomeView: View {
     @State private var toast: String?
     @State private var copies = 0
     @State private var pendingDelete: Account?
+    /// Tap to Reveal: when each revealed code hides again.
+    @State private var revealedUntil: [Account.ID: Date] = [:]
+    @State private var highlighted: Account.ID?
     @Namespace private var chips
 
     private var visibleAccounts: [Account] {
@@ -38,7 +42,16 @@ struct HomeView: View {
                                 // landscape, and more on iPad and Mac as the window grows.
                                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 320, maximum: 520), spacing: 14)], spacing: 14) {
                                     ForEach(visibleAccounts) { account in
-                                        AccountCard(account: account, now: timeline.date) { code in
+                                        AccountCard(
+                                            account: account,
+                                            now: timeline.date,
+                                            isRevealed: !settings.tapToReveal || (revealedUntil[account.id] ?? .distantPast) > timeline.date,
+                                            isHighlighted: highlighted == account.id,
+                                            protectsCode: AppSettings.canBlockScreenshots && !settings.allowScreenshots,
+                                            tapCopies: settings.tapToCopy || settings.highlightOnTap
+                                        ) { code in
+                                            tap(account, code: code, now: timeline.date)
+                                        } onCopy: { code in
                                             copy(code)
                                         } onDelete: {
                                             pendingDelete = account
@@ -122,6 +135,24 @@ struct HomeView: View {
             }
         }
         .scrollClipDisabled()
+    }
+
+    /// Same order as the Android app: reveal a hidden code, then highlight, then copy.
+    private func tap(_ account: Account, code: String, now: Date) {
+        if settings.tapToReveal, (revealedUntil[account.id] ?? .distantPast) <= now {
+            revealedUntil[account.id] = now.addingTimeInterval(settings.revealSeconds)
+            return
+        }
+        if settings.highlightOnTap {
+            if highlighted == account.id {
+                highlighted = nil
+                copy(code)
+            } else {
+                highlighted = account.id
+            }
+            return
+        }
+        if settings.tapToCopy { copy(code) }
     }
 
     private func copy(_ code: String) {

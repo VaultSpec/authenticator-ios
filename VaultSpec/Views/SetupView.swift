@@ -3,6 +3,7 @@ import SwiftUI
 /// First launch: create the vault password.
 struct SetupView: View {
     @Environment(VaultStore.self) private var vault
+    @Environment(AppSettings.self) private var settings
     @State private var password = ""
     @State private var confirmation = ""
     @State private var enableBiometrics = true
@@ -110,6 +111,7 @@ struct SetupView: View {
         Task {
             do {
                 try await vault.setUp(password: password, enableBiometrics: enableBiometrics && vault.biometryName != nil)
+                settings.recordPasswordEntry()
             } catch {
                 self.error = error.localizedDescription
             }

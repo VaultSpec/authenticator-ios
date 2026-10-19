@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The sheets the Cloud Backup section opens. They are presented by the Settings screen itself:
-/// a sheet attached to a row inside a Form can dismiss the screen that contains it.
+/// SwiftUI copies a Section's modifiers onto each of its rows, so a sheet or dialog attached to the
+/// section is presented several times at once, and UIKit then dismisses Settings.
 enum CloudSheet: String, Identifiable {
     case signIn, enable, restore, delete
     var id: String { rawValue }
@@ -10,9 +11,9 @@ enum CloudSheet: String, Identifiable {
 /// The "Cloud Backup" group in Settings.
 struct CloudBackupSection: View {
     @Binding var sheet: CloudSheet?
+    @Binding var confirmingSignOut: Bool
     @Environment(CloudStore.self) private var cloud
     @Environment(VaultStore.self) private var vault
-    @State private var confirmingSignOut = false
     @State private var error: String?
 
     var body: some View {
@@ -62,13 +63,6 @@ struct CloudBackupSection: View {
             Text(cloud.isSignedIn
                 ? "Backups are encrypted with your vault password before they leave this device, so VaultSpec can't read them. The newest 3 are kept."
                 : "Keep an encrypted backup in a VaultSpec account and restore it on a new iPhone, iPad, Mac or Android phone.")
-        }
-        .confirmationDialog("Sign out of VaultSpec Cloud?", isPresented: $confirmingSignOut, titleVisibility: .visible) {
-            Button("Sign Out", role: .destructive) {
-                Task { await cloud.signOut() }
-            }
-        } message: {
-            Text("This device stops backing up. Backups already in your account stay there.")
         }
     }
 

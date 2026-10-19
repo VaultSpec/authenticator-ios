@@ -3,6 +3,7 @@ import SwiftUI
 /// Locked vault: password, or Face ID / Touch ID when enabled.
 struct LockView: View {
     @Environment(VaultStore.self) private var vault
+    @Environment(AppSettings.self) private var settings
     @State private var password = ""
     @State private var error: String?
     @State private var working = false
@@ -17,7 +18,9 @@ struct LockView: View {
                     LogoMark().frame(width: 88, height: 88)
                     Text("Welcome Back")
                         .font(.largeTitle.weight(.bold))
-                    Text("Unlock your vault to see your codes.")
+                    Text(reminderDue
+                        ? "Enter your vault password. For your security, VaultSpec asks for it every \(settings.passwordReminderDays) days."
+                        : "Unlock your vault to see your codes.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -37,12 +40,19 @@ struct LockView: View {
         }
         .sensoryFeedback(.error, trigger: attempts)
         .task {
-            if vault.biometricsEnabled, vault.biometryName != nil {
+            if canUseBiometrics {
                 unlockWithBiometrics()
             } else {
                 focused = true
             }
         }
+    }
+
+    /// The periodic password check: biometrics stay off until the password is entered.
+    private var reminderDue: Bool { settings.isPasswordReminderDue() }
+
+    private var canUseBiometrics: Bool {
+        vault.biometricsEnabled && vault.biometryName != nil && !reminderDue
     }
 
     private var unlockForm: some View {
@@ -74,7 +84,7 @@ struct LockView: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(password.isEmpty || working)
 
-                    if vault.biometricsEnabled, vault.biometryName != nil {
+                    if canUseBiometrics {
                         Button(action: unlockWithBiometrics) {
                             Image(systemName: vault.biometrySymbol)
                                 .font(.title2)
@@ -97,6 +107,7 @@ struct LockView: View {
         Task {
             do {
                 try await vault.unlock(password: password)
+                settings.recordPasswordEntry()
             } catch {
                 self.error = error.localizedDescription
                 attempts += 1
