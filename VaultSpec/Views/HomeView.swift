@@ -87,6 +87,16 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showingAdd) { AddAccountView() }
             .sheet(isPresented: $showingSettings) { SettingsView() }
+            #if DEBUG
+            // `-screen settings|add` opens that sheet on launch, for App Store screenshots
+            .task {
+                switch UserDefaults.standard.string(forKey: "screen") {
+                case "settings": showingSettings = true
+                case "add": showingAdd = true
+                default: break
+                }
+            }
+            #endif
             .confirmationDialog(
                 "Delete \(pendingDelete?.title ?? "account")?",
                 isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),

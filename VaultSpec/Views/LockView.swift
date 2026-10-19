@@ -8,6 +8,9 @@ struct LockView: View {
     @State private var error: String?
     @State private var working = false
     @State private var attempts = 0
+    /// Biometrics are offered automatically once per lock; the button stays for retries.
+    @State private var prompted = false
+    @Environment(\.scenePhase) private var scenePhase
     @FocusState private var focused: Bool
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -39,12 +42,21 @@ struct LockView: View {
             .frame(maxWidth: verticalSizeClass == .compact ? 880 : 520)
         }
         .sensoryFeedback(.error, trigger: attempts)
-        .task {
-            if canUseBiometrics {
-                unlockWithBiometrics()
-            } else {
-                focused = true
-            }
+        .task { promptIfActive() }
+        // The vault can lock while the app is away; ask for Face ID / Touch ID only once the
+        // person is back, not as a pop-up over whatever they switched to.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { promptIfActive() }
+        }
+    }
+
+    private func promptIfActive() {
+        guard scenePhase == .active, !prompted else { return }
+        prompted = true
+        if canUseBiometrics {
+            unlockWithBiometrics()
+        } else {
+            focused = true
         }
     }
 

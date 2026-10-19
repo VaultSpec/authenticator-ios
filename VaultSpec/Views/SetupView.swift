@@ -4,12 +4,14 @@ import SwiftUI
 struct SetupView: View {
     @Environment(VaultStore.self) private var vault
     @Environment(AppSettings.self) private var settings
+    @Environment(CloudStore.self) private var cloud
     @State private var password = ""
     @State private var confirmation = ""
     @State private var enableBiometrics = true
     @State private var error: String?
     @State private var working = false
     @State private var showingRestore = false
+    @State private var restored: RestoredBackup?
     @FocusState private var focused: Field?
 
     private enum Field { case password, confirmation }
@@ -62,7 +64,9 @@ struct SetupView: View {
             .padding(24)
             .frame(maxWidth: verticalSizeClass == .compact ? 880 : 520)
         }
-        .sheet(isPresented: $showingRestore) { CloudRestoreView(mode: .newVault) }
+        .sheet(isPresented: $showingRestore, onDismiss: finishRestore) {
+            CloudRestoreView(mode: .newVault) { restored = $0 }
+        }
     }
 
     private var fields: some View {
@@ -112,6 +116,26 @@ struct SetupView: View {
             do {
                 try await vault.setUp(password: password, enableBiometrics: enableBiometrics && vault.biometryName != nil)
                 settings.recordPasswordEntry()
+            } catch {
+                self.error = error.localizedDescription
+            }
+            working = false
+        }
+    }
+
+    /// Runs once the restore sheet has closed: the backup's vault password becomes this vault's.
+    private func finishRestore() {
+        guard let backup = restored else { return }
+        restored = nil
+        error = nil
+        working = true
+        Task {
+            do {
+                try await vault.setUp(password: backup.password, enableBiometrics: backup.enableBiometrics, restoring: true)
+                try vault.importAccounts(backup.accounts)
+                settings.recordPasswordEntry()
+                // Future backups use this device's key; failing here only delays them
+                try? await cloud.adopt(vaultPassword: backup.password)
             } catch {
                 self.error = error.localizedDescription
             }

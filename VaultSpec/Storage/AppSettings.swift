@@ -15,12 +15,21 @@ final class AppSettings {
     var highlightOnTap: Bool { didSet { defaults.set(highlightOnTap, forKey: Keys.highlightOnTap) } }
     /// Face ID / Touch ID stops working after this many days until the vault password is entered.
     var passwordReminderDays: Int { didSet { defaults.set(passwordReminderDays, forKey: Keys.reminderDays) } }
+    /// How long the app can be away (in the background, or behind other apps on the Mac) before
+    /// the vault locks. 0 locks as soon as it's away.
+    var autoLockSeconds: Int { didSet { defaults.set(autoLockSeconds, forKey: Keys.autoLockSeconds) } }
     private(set) var lastPasswordUnlock: Date?
 
     let revealSeconds: TimeInterval = 30
     /// The screenshot shield relies on iOS's secure text field; it isn't used on the Mac.
     static let canBlockScreenshots = !ProcessInfo.processInfo.isMacCatalystApp
     static let reminderChoices = [7, 15, 30]
+    static let autoLockChoices: [(seconds: Int, label: String)] = [
+        (0, "Immediately"), (60, "After 1 minute"), (300, "After 5 minutes"),
+        (900, "After 15 minutes"), (3600, "After 1 hour"),
+    ]
+    /// A Mac sits behind other windows all day while people paste codes, so it waits longer by default.
+    static let defaultAutoLockSeconds = ProcessInfo.processInfo.isMacCatalystApp ? 300 : 60
 
     private enum Keys {
         static let allowScreenshots = "behavior.allowScreenshots"
@@ -28,6 +37,7 @@ final class AppSettings {
         static let tapToCopy = "behavior.tapToCopy"
         static let highlightOnTap = "behavior.highlightOnTap"
         static let reminderDays = "behavior.passwordReminderDays"
+        static let autoLockSeconds = "security.autoLockSeconds"
         static let lastPasswordUnlock = "behavior.lastPasswordUnlock"
     }
 
@@ -42,6 +52,9 @@ final class AppSettings {
         highlightOnTap = flag(Keys.highlightOnTap, default: false)
         let days = defaults.integer(forKey: Keys.reminderDays)
         passwordReminderDays = Self.reminderChoices.contains(days) ? days : 15
+        let lockAfter = defaults.object(forKey: Keys.autoLockSeconds) as? Int
+        autoLockSeconds = lockAfter.flatMap { s in Self.autoLockChoices.contains { $0.seconds == s } ? s : nil }
+            ?? Self.defaultAutoLockSeconds
         lastPasswordUnlock = defaults.object(forKey: Keys.lastPasswordUnlock) as? Date
     }
 

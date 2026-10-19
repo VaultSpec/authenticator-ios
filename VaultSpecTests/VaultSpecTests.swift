@@ -144,6 +144,19 @@ struct AppSettingsTests {
         let second = AppSettings(defaults: defaults)
         #expect(second.tapToReveal && second.passwordReminderDays == 7)
     }
+
+    @Test func autoLock() {
+        let defaults = UserDefaults(suiteName: "settings-autolock")!
+        defaults.removePersistentDomain(forName: "settings-autolock")
+        let first = AppSettings(defaults: defaults)
+        #expect(first.autoLockSeconds == AppSettings.defaultAutoLockSeconds)
+        first.autoLockSeconds = 900
+        #expect(AppSettings(defaults: defaults).autoLockSeconds == 900)
+        defaults.set(42, forKey: "security.autoLockSeconds") // not a choice: fall back to the default
+        #expect(AppSettings(defaults: defaults).autoLockSeconds == AppSettings.defaultAutoLockSeconds)
+        first.autoLockSeconds = 0
+        #expect(AppSettings(defaults: defaults).autoLockSeconds == 0) // "Immediately" survives a restart
+    }
 }
 
 struct ScreenshotShieldTests {

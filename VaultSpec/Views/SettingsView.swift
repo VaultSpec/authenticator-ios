@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(VaultStore.self) private var vault
     @Environment(CloudStore.self) private var cloud
+    @Environment(AppSettings.self) private var appSettings
     @Environment(\.dismiss) private var dismiss
     @State private var showingPassword = false
     @State private var confirmingErase = false
@@ -15,6 +16,7 @@ struct SettingsView: View {
     }
 
     var body: some View {
+        @Bindable var settings = appSettings
         NavigationStack {
             Form {
                 Section("Security") {
@@ -28,6 +30,12 @@ struct SettingsView: View {
                             Label("Unlock with \(biometry)", systemImage: vault.biometrySymbol)
                         }
                     }
+                    Picker(selection: $settings.autoLockSeconds) {
+                        ForEach(AppSettings.autoLockChoices, id: \.seconds) { Text($0.label).tag($0.seconds) }
+                    } label: {
+                        Label("Auto-Lock", systemImage: "timer")
+                    }
+                    .pickerStyle(.menu)
                     Button("Change Vault Password", systemImage: "key") { showingPassword = true }
                     Button("Lock Now", systemImage: "lock") {
                         dismiss()

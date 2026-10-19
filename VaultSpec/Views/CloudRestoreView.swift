@@ -7,10 +7,11 @@ import SwiftUI
 struct CloudRestoreView: View {
     enum Mode { case newVault, merge }
     let mode: Mode
+    /// `.newVault`: receives the opened backup; the presenter creates the vault after this sheet closes.
+    var onRestored: ((RestoredBackup) -> Void)? = nil
 
     @Environment(CloudStore.self) private var cloud
     @Environment(VaultStore.self) private var vault
-    @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
 
     private enum Remote {
@@ -154,14 +155,13 @@ struct CloudRestoreView: View {
                 let accounts = try await cloud.decrypt(payload, vaultPassword: password)
                 switch mode {
                 case .newVault:
-                    try await vault.setUp(
-                        password: password,
-                        enableBiometrics: enableBiometrics && vault.biometryName != nil,
-                        restoring: true
-                    )
-                    try vault.importAccounts(accounts)
-                    settings.recordPasswordEntry()
-                    try? await cloud.adopt(vaultPassword: password)
+                    // Creating the vault swaps the setup screen for the home screen. Doing that while
+                    // this sheet is up removes the view presenting it, and the sheet is left stuck on
+                    // screen (Mac Catalyst). So close first and let the presenter finish.
+                    onRestored?(RestoredBackup(
+                        accounts: accounts, password: password,
+                        enableBiometrics: enableBiometrics && vault.biometryName != nil
+                    ))
                     dismiss()
                 case .merge:
                     let added = try vault.importAccounts(accounts)
@@ -176,4 +176,11 @@ struct CloudRestoreView: View {
             }
         }
     }
+}
+
+/// A backup that opened with its vault password, ready to become this device's vault.
+struct RestoredBackup {
+    let accounts: [Account]
+    let password: String
+    let enableBiometrics: Bool
 }

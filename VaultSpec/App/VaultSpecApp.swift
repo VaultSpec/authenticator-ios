@@ -27,7 +27,11 @@ struct VaultSpecApp: App {
 struct RootView: View {
     @Environment(VaultStore.self) private var vault
     @Environment(CloudStore.self) private var cloud
+    @Environment(AppSettings.self) private var settings
     @Environment(\.scenePhase) private var scenePhase
+    /// When the app went away (background, or behind other apps on the Mac); nil while in use.
+    @State private var awaySince: Date?
+    @State private var autoLock: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -45,9 +49,7 @@ struct RootView: View {
         }
         .animation(.smooth(duration: 0.35), value: vault.state)
         .animation(.easeInOut(duration: 0.2), value: scenePhase)
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .background { vault.lock() }
-        }
+        .onChange(of: scenePhase) { _, phase in handleAutoLock(phase) }
         // Automatic cloud backup after every change, and a retry of a failed one on unlock
         .onChange(of: vault.revision) {
             cloud.scheduleBackup(vault.accounts)
@@ -62,6 +64,35 @@ struct RootView: View {
             }
         }
         #endif
+    }
+
+    /// Locks once the app has been away for the Auto-Lock time. A timer covers a Mac app left
+    /// running behind other windows; the check on return covers an iPhone app suspended in the
+    /// background, where timers don't run.
+    private func handleAutoLock(_ phase: ScenePhase) {
+        #if targetEnvironment(macCatalyst)
+        let away = phase != .active
+        #else
+        let away = phase == .background
+        #endif
+        let limit = settings.autoLockSeconds
+        if away {
+            guard awaySince == nil else { return }
+            awaySince = .now
+            if limit == 0 {
+                vault.lock()
+            } else {
+                autoLock = Task {
+                    try? await Task.sleep(for: .seconds(limit))
+                    if !Task.isCancelled { vault.lock() }
+                }
+            }
+        } else if phase == .active {
+            autoLock?.cancel()
+            autoLock = nil
+            if let since = awaySince, Date.now.timeIntervalSince(since) >= Double(limit) { vault.lock() }
+            awaySince = nil
+        }
     }
 
     private var hidesVault: Bool {
@@ -89,7 +120,16 @@ private struct PrivacyCover: View {
 /// Launch arguments for screenshots: `-colorScheme dark|light` and `-orientation landscape`.
 private enum DebugOptions {
     static func applyOrientation() {
-        #if !targetEnvironment(macCatalyst)
+        #if targetEnvironment(macCatalyst)
+        // `-windowSize 1280x800` pins the window size, for App Store screenshots
+        let parts = UserDefaults.standard.string(forKey: "windowSize")?.split(separator: "x").compactMap { Double($0) } ?? []
+        guard parts.count == 2 else { return }
+        let size = CGSize(width: parts[0], height: parts[1])
+        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+            scene.sizeRestrictions?.minimumSize = size
+            scene.sizeRestrictions?.maximumSize = size
+        }
+        #else
         guard UserDefaults.standard.string(forKey: "orientation") == "landscape" else { return }
         for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
             scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
