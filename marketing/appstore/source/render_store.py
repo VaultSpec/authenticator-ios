@@ -306,7 +306,7 @@ place(c, shot("iphone-lock"), "phone", 660, 2440, 2300, yaw=-12, pitch=16, roll=
 finish(c, "iphone-04-lock", (PW, PH))
 
 c = phone_canvas((0.55, 0.62))
-text_block(c, "iPhone · iPad · Mac", "One vault on\nevery device.", "Encrypted cloud backup restores on iPhone,\niPad, Mac and Android.", 150)
+text_block(c, "iPhone · iPad · Mac", "One vault on\nevery device.", "Encrypted cloud backup restores your\ncodes on any iPhone, iPad or Mac.", 150)
 badges(c, [("End-to-end encrypted backup", GREEN)], 740)
 place(c, shot("ipad-codes"), "ipad", 560, 1640, 1420, yaw=22, pitch=6, roll=2, depth=0.035)
 place(c, shot("iphone-codes"), "phone", 930, 1980, 1380, yaw=-20, pitch=7, roll=-3, glow=False)
@@ -334,7 +334,7 @@ place(c, shot("ipad-settings"), "ipad", 1032, 1780, 1740, yaw=16, pitch=7, roll=
 finish(c, "ipad-02-security", (IW, IH))
 
 c = ipad_canvas((0.55, 0.64))
-text_block(c, "iPhone · iPad · Mac", "One vault on\nevery device.", "Encrypted cloud backup restores on iPhone, iPad, Mac and Android.", 140, scale=1.2)
+text_block(c, "iPhone · iPad · Mac", "One vault on\nevery device.", "Encrypted cloud backup restores your codes on any iPhone, iPad or Mac.", 140, scale=1.2)
 badges(c, [("End-to-end encrypted backup", GREEN)], 720, scale=1.2)
 place(c, shot("ipad-codes"), "ipad", 900, 1740, 1620, yaw=20, pitch=6, roll=2, depth=0.035)
 place(c, shot("iphone-codes"), "phone", 1560, 1990, 1250, yaw=-20, pitch=7, roll=-3, glow=False)
