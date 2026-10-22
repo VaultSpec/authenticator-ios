@@ -1,0 +1,7 @@
+# Recordings, renders, narration cache and the local Python environment stay out of git
+work/
+audio/
+build/
+*.mp4
+*.png
+.env
