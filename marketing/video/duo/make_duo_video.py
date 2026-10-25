@@ -32,6 +32,10 @@ GREEN, AMBER, VIOLET = (52, 211, 153), (255, 176, 32), (167, 139, 250)
 SCR_W, SCR_H, SCR_X, SCR_Y, SCR_R = 810, 1178, 135, 350, 66
 BEZEL, RAIL = 13, 6
 BODY = BEZEL + RAIL
+# The fold scene shows the Mac recording of the simulator in a rounded stage panel instead of a device body
+FOLD_SRC = HERE / "duo-fold.mov"
+FOLD_S, FOLD_X, FOLD_Y, FOLD_R = 960, 60, 420, 52
+STAGE = (29, 29, 29)             # the recording's own background, so the crop blends into the panel
 
 SCENES = [
     dict(
@@ -59,6 +63,17 @@ SCENES = [
         chips=[("Auto-Lock", AMBER), ("Block screenshots", GREEN), ("Tap to reveal", ACCENT)],
         say="Choose when it auto-locks, block screenshots, and hide your codes until you tap them.",
         footage=[("duo-add", 6.3, 10.1)],
+    ),
+    dict(
+        kind="fold", headline="Fits your Duo", eyebrow="IPHONE DUO",
+        sub="Fold it, open it, rotate it",
+        chips=[("Upright: one column", ACCENT), ("Open: a full grid", GREEN), ("Any orientation", VIOLET)],
+        say="On iPhone Duo, VaultSpec fits the way you hold it. Held upright, you get a clean single column. "
+            "Turn it, open it up, and your codes spread out into a grid.",
+        # (start, end, centre x, centre y, side) in the 2452x1668 Mac recording; the cuts skip the
+        # fold transitions, where the screen goes black, and the stretches with the mouse pointer.
+        fold=[(1.5, 2.8, 1222, 860, 1040), (17.5, 21.5, 1222, 862, 1380),
+              (9.4, 11.0, 1222, 856, 1380), (36.8, 40.0, 1222, 856, 1380)],
     ),
     dict(
         kind="outro", headline="Download now",
@@ -114,12 +129,22 @@ def scene_card(scene, path):
         mv.centered(d, 134, scene["headline"], mv.font("bold", 76), WHITE)
         mv.centered(d, 232, scene["sub"], mv.font("medium", 36), GRAY)
         shadow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        ImageDraw.Draw(shadow).rounded_rectangle(
-            (SCR_X - BODY - 6, SCR_Y - BODY + 20, SCR_X + SCR_W + BODY + 6, SCR_Y + SCR_H + BODY + 32),
-            radius=SCR_R + BODY, fill=(0, 0, 0, 170))
-        blurred = shadow.filter(ImageFilter.GaussianBlur(30))
-        img.paste(blurred, (0, 0), blurred)
-        chip_row(d, SCR_Y + SCR_H + BODY + 34, scene["chips"])
+        if kind == "fold":
+            ImageDraw.Draw(shadow).rounded_rectangle(
+                (FOLD_X - 6, FOLD_Y + 20, FOLD_X + FOLD_S + 6, FOLD_Y + FOLD_S + 34), radius=FOLD_R, fill=(0, 0, 0, 170))
+            blurred = shadow.filter(ImageFilter.GaussianBlur(30))
+            img.paste(blurred, (0, 0), blurred)
+            d = ImageDraw.Draw(img)
+            d.rounded_rectangle((FOLD_X, FOLD_Y, FOLD_X + FOLD_S, FOLD_Y + FOLD_S), radius=FOLD_R, fill=STAGE,
+                                outline=(70, 78, 98), width=3)
+            chip_row(d, FOLD_Y + FOLD_S + 38, scene["chips"])
+        else:
+            ImageDraw.Draw(shadow).rounded_rectangle(
+                (SCR_X - BODY - 6, SCR_Y - BODY + 20, SCR_X + SCR_W + BODY + 6, SCR_Y + SCR_H + BODY + 32),
+                radius=SCR_R + BODY, fill=(0, 0, 0, 170))
+            blurred = shadow.filter(ImageFilter.GaussianBlur(30))
+            img.paste(blurred, (0, 0), blurred)
+            chip_row(d, SCR_Y + SCR_H + BODY + 34, scene["chips"])
     img.save(path)
 
 
@@ -151,7 +176,30 @@ def build_scene(index, scene, audio, mask, frame):
     scene_card(scene, base)
     inputs = ["-loop", "1", "-t", f"{seconds}", "-framerate", f"{FPS}", "-i", base]
     graph, last, n = [], "0:v", 1
-    if not card:
+    if kind == "fold":
+        out = mv.BUILD / f"fg_{index:02d}.mp4"
+        segs = scene["fold"]
+        total = sum(e - s for s, e, *_ in segs)
+        speed = max(total / seconds, 0.85)
+        fin, parts = [], []
+        for k, (s, e, cx, cy, side) in enumerate(segs):
+            fin += ["-ss", f"{s}", "-t", f"{e - s}", "-i", FOLD_SRC]
+            parts.append(f"[{k}:v]crop={side}:{side}:{cx - side // 2}:{max(0, cy - side // 2)},"
+                         f"scale={FOLD_S}:{FOLD_S}:flags=lanczos,setsar=1,fps={FPS}[v{k}]")
+        joined = "".join(f"[v{k}]" for k in range(len(segs)))
+        mv.run(*fin, "-filter_complex", ";".join(parts) + (
+            f";{joined}concat=n={len(segs)}:v=1:a=0,setpts=PTS/{speed:.4f},fps={FPS},"
+            f"tpad=stop_mode=clone:stop_duration={seconds},trim=duration={seconds:.3f}[out]"),
+            "-map", "[out]", "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "16", "-pix_fmt", "yuv420p", out)
+        fmask = mv.BUILD / "mask_fold.png"
+        mv.screen_mask(fmask, FOLD_S, FOLD_S, FOLD_R)
+        inputs += ["-i", out, "-loop", "1", "-t", f"{seconds}", "-i", fmask]
+        graph += [
+            f"[{n}:v]format=rgba[fg];[{n + 1}:v]format=gray[mk];[fg][mk]alphamerge[stage]",
+            f"[{last}][stage]overlay={FOLD_X}:{FOLD_Y}[framed]",
+        ]
+        last, n = "framed", n + 2
+    elif not card:
         out = mv.BUILD / f"fg_{index:02d}.mp4"
         segs = scene["footage"]
         total = sum(e - s for _, s, e in segs)
