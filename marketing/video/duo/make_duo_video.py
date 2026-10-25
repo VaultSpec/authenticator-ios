@@ -8,8 +8,11 @@ Footage is in marketing/video/duo/work/rec: screen recordings of the outer displ
 simulator running the demo vault (nothing personal on screen). Narration is ElevenLabs when a key is
 available (see ../make_video.py), cached in duo/audio; otherwise a silent, captioned render. The music
 is mixed under the voice and ducks whenever the narrator speaks.
+No store badge, price or donation link: the video only introduces the app on iPhone Duo.
+Layout: all text sits between about y=150 and y=1660 so Reels, Shorts and TikTok overlays don't cover it.
 Writes marketing/video/duo/VaultSpec-iPhone-Duo-launch.mp4.
 """
+import re
 import sys
 from pathlib import Path
 
@@ -28,20 +31,21 @@ LEAD, TAIL = mv.LEAD, mv.TAIL
 WHITE, GRAY, ACCENT = mv.WHITE, mv.GRAY, mv.ACCENT
 GREEN, AMBER, VIOLET = (52, 211, 153), (255, 176, 32), (167, 139, 250)
 
-# The Duo's outer screen is 1398×2034 (0.687). Shown 810×1178, centred, under the headline block.
-SCR_W, SCR_H, SCR_X, SCR_Y, SCR_R = 810, 1178, 135, 350, 66
+# The Duo's outer screen is 1398×2034 (0.687). Shown 680×990, centred, under the headline block.
+SCR_W, SCR_H, SCR_X, SCR_Y, SCR_R = 680, 990, 200, 370, 56
+CAPTION_Y = 1540                 # captions end by about y=1660, above the bottom overlays of short-video apps
 BEZEL, RAIL = 13, 6
 BODY = BEZEL + RAIL
 # The fold scene shows the Mac recording of the simulator in a rounded stage panel instead of a device body
 FOLD_SRC = HERE / "duo-fold.mov"
-FOLD_S, FOLD_X, FOLD_Y, FOLD_R = 960, 60, 420, 52
+FOLD_S, FOLD_X, FOLD_Y, FOLD_R = 900, 90, 370, 52
 STAGE = (29, 29, 29)             # the recording's own background, so the crop blends into the panel
 
 SCENES = [
     dict(
         kind="title", headline="VaultSpec Authenticator",
-        say="VaultSpec Authenticator is now on the App Store, and it's built for iPhone Duo. "
-            "Free, open source, and encrypted on your device.",
+        say="This is VaultSpec Authenticator, built for iPhone Duo. "
+            "Your two-factor codes, encrypted on your device.",
     ),
     dict(
         headline="Every code at a glance", eyebrow="YOUR CODES",
@@ -72,20 +76,58 @@ SCENES = [
             "Turn it, open it up, and your codes spread out into a grid.",
         # (start, end, centre x, centre y, side) in the 2452x1668 Mac recording; the cuts skip the
         # fold transitions, where the screen goes black, and the stretches with the mouse pointer.
-        fold=[(1.5, 2.8, 1222, 860, 1040), (17.5, 21.5, 1222, 862, 1380),
-              (9.4, 11.0, 1222, 856, 1380), (36.8, 40.0, 1222, 856, 1380)],
+        fold=[(1.5, 2.8, 1222, 860, 950), (17.5, 21.5, 1222, 862, 1290),
+              (9.4, 11.0, 1222, 856, 1290), (36.8, 40.0, 1222, 856, 1290)],
     ),
     dict(
-        kind="outro", headline="Download now",
-        say="Search VaultSpec Authenticator on the App Store and download it today. It's free. "
-            "If you like it and want to support my work, you can buy me a coffee at "
-            "buy me a coffee dot com, slash dhruvesh sixteen. Thanks for using VaultSpec.",
-        caption="Search VaultSpec Authenticator on the App Store and download it today. It's free. "
-                "If you like it and want to support my work, you can buy me a coffee at "
-                "buymeacoffee.com/dhruvesh16. Thanks for using VaultSpec.",
-        hold=1.5,
+        kind="outro", headline="VaultSpec Authenticator",
+        say="VaultSpec Authenticator. Two-factor codes, encrypted on your device, "
+            "and built for iPhone Duo. Learn more at vaultspec dot in.",
+        caption="VaultSpec Authenticator. Two-factor codes, encrypted on your device, "
+                "and built for iPhone Duo. Learn more at vaultspec.in.",
+        hold=1.0,
     ),
 ]
+
+
+def split_phrase(text, limit=50):
+    """Splits at a comma or conjunction near the middle until every piece fits on one caption line."""
+    text = text.strip()
+    if len(text) <= limit:
+        return [text]
+    middle = len(text) / 2
+    breaks = [m.end() for m in re.finditer(r",\s+", text)] + [m.start() + 1 for m in re.finditer(r"\s(?:and|or|so|then)\s", text)]
+    breaks = [i for i in breaks if 12 <= i <= len(text) - 12] or [i + 1 for i, c in enumerate(text) if c == " " and 12 <= i <= len(text) - 12]
+    cut = min(breaks, key=lambda i: abs(i - middle))
+    return split_phrase(text[:cut], limit) + split_phrase(text[cut:], limit)
+
+
+def caption_chunks(text, speech_seconds):
+    """(text, start, end) caption pieces: whole sentences or phrases, timed in proportion to their length."""
+    pieces = []
+    for sentence in re.split(r"(?<=[.!?])\s+", text.strip()):
+        pieces += split_phrase(sentence)
+    total = sum(len(p) for p in pieces)
+    timed, t = [], LEAD
+    for piece in pieces:
+        length = speech_seconds * len(piece) / total
+        timed.append((piece, t, t + length))
+        t += length
+    return timed
+
+
+def caption_image(text, path, card):
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    f = mv.font("semibold", 42)
+    lines = mv.wrap(d, text.rstrip("."), f, W - 160)
+    y = CAPTION_Y + (2 - min(len(lines), 2)) * 30
+    for line in lines:
+        tw = d.textlength(line, font=f)
+        d.rounded_rectangle(((W - tw) / 2 - 20, y - 6, (W + tw) / 2 + 20, y + 54), radius=16, fill=(0, 0, 0, 130))
+        mv.centered(d, y, line, f, WHITE)
+        y += 64
+    img.save(path)
 
 
 def chip_row(d, y, chips):
@@ -105,29 +147,28 @@ def scene_card(scene, path):
     kind = scene.get("kind", "phone")
     if kind == "title":
         icon = mv.app_icon(300)
-        img.paste(icon, ((W - 300) // 2, 440), icon)
-        mv.centered(d, 800, "VaultSpec", mv.font("bold", 104), WHITE)
-        mv.centered(d, 920, "Authenticator", mv.font("medium", 60), GRAY)
-        pill, f = "NOW ON THE APP STORE", mv.font("semibold", 32)
+        img.paste(icon, ((W - 300) // 2, 400), icon)
+        mv.centered(d, 760, "VaultSpec", mv.font("bold", 104), WHITE)
+        mv.centered(d, 880, "Authenticator", mv.font("medium", 60), GRAY)
+        pill, f = "BUILT FOR IPHONE DUO", mv.font("semibold", 32)
         pw = d.textlength(pill, font=f) + 72
-        d.rounded_rectangle(((W - pw) / 2, 1070, (W + pw) / 2, 1146), radius=38, fill=ACCENT)
-        mv.centered(d, 1088, pill, f, WHITE)
-        mv.centered(d, 1210, "Built for iPhone Duo", mv.font("bold", 54), WHITE)
-        mv.centered(d, 1284, "iPhone  ·  iPad  ·  Mac", mv.font("semibold", 32), GRAY)
+        d.rounded_rectangle(((W - pw) / 2, 1020, (W + pw) / 2, 1096), radius=38, fill=ACCENT)
+        mv.centered(d, 1038, pill, f, WHITE)
+        mv.centered(d, 1160, "Two-factor codes,", mv.font("medium", 44), GRAY)
+        mv.centered(d, 1218, "encrypted on your device", mv.font("medium", 44), GRAY)
     elif kind == "outro":
-        icon = mv.app_icon(200)
-        img.paste(icon, ((W - 200) // 2, 300), icon)
-        mv.centered(d, 540, "Download now", mv.font("bold", 84), WHITE)
-        mv.centered(d, 650, "Free on iPhone, iPad and Mac", mv.font("medium", 42), GRAY)
-        mv.store_badge(img, 760)
-        d.rounded_rectangle((110, 960, W - 110, 1240), radius=44, fill=(28, 28, 32))
-        mv.centered(d, 1000, "SUPPORT MY WORK", mv.font("semibold", 30), ACCENT)
-        mv.centered(d, 1062, "buymeacoffee.com", mv.font("bold", 58), WHITE)
-        mv.centered(d, 1138, "/dhruvesh16", mv.font("bold", 58), (255, 184, 77))
+        icon = mv.app_icon(220)
+        img.paste(icon, ((W - 220) // 2, 360), icon)
+        mv.centered(d, 620, "VaultSpec", mv.font("bold", 84), WHITE)
+        mv.centered(d, 718, "Authenticator", mv.font("medium", 52), GRAY)
+        d.rounded_rectangle((110, 860, W - 110, 1090), radius=44, fill=(28, 28, 32))
+        mv.centered(d, 904, "LEARN MORE", mv.font("semibold", 30), ACCENT)
+        mv.centered(d, 962, "vaultspec.in", mv.font("bold", 82), WHITE)
+        chip_row(d, 1160, [("Open source", ACCENT), ("Encrypted", GREEN), ("Works offline", VIOLET)])
     else:
-        mv.centered(d, 84, f"VAULTSPEC  ·  {scene['eyebrow']}", mv.font("semibold", 28), ACCENT)
-        mv.centered(d, 134, scene["headline"], mv.font("bold", 76), WHITE)
-        mv.centered(d, 232, scene["sub"], mv.font("medium", 36), GRAY)
+        mv.centered(d, 150, f"VAULTSPEC  ·  {scene['eyebrow']}", mv.font("semibold", 28), ACCENT)
+        mv.centered(d, 198, scene["headline"], mv.font("bold", 74), WHITE)
+        mv.centered(d, 292, scene["sub"], mv.font("medium", 36), GRAY)
         shadow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
         if kind == "fold":
             ImageDraw.Draw(shadow).rounded_rectangle(
@@ -221,9 +262,9 @@ def build_scene(index, scene, audio, mask, frame):
         ]
         last, n = "framed", n + 3
 
-    for c, (text, start, end) in enumerate(mv.caption_chunks(scene.get("caption", scene["say"]), speech)):
+    for c, (text, start, end) in enumerate(caption_chunks(scene.get("caption", scene["say"]), speech)):
         png = mv.BUILD / f"cap_{index:02d}_{c:02d}.png"
-        mv.caption_image(text, png, card)
+        caption_image(text, png, card)
         inputs += ["-loop", "1", "-t", f"{seconds}", "-i", png]
         graph.append(f"[{last}][{n}:v]overlay=0:0:enable='between(t,{start:.2f},{end:.2f})'[c{c}]")
         last, n = f"c{c}", n + 1
