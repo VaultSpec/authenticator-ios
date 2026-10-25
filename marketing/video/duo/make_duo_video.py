@@ -39,7 +39,7 @@ BODY = BEZEL + RAIL
 # The fold scene shows the Mac recording of the simulator in a rounded stage panel instead of a device body
 FOLD_SRC = HERE / "duo-fold.mov"
 FOLD_S, FOLD_X, FOLD_Y, FOLD_R = 960, 60, 470, 52
-STAGE = (29, 29, 29)             # the recording's own background, so the crop blends into the panel
+BG_KEY = "0x1d1d1d"             # the recording's flat background colour; keyed out so the device floats
 
 SCENES = [
     dict(kind="title", headline="VaultSpec Authenticator", seconds=4.2),
@@ -133,13 +133,15 @@ def scene_card(scene, path):
         mv.centered(d, 292, scene["sub"], mv.font("medium", 36), GRAY)
         shadow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
         if kind == "fold":
-            ImageDraw.Draw(shadow).rounded_rectangle(
-                (FOLD_X - 6, FOLD_Y + 20, FOLD_X + FOLD_S + 6, FOLD_Y + FOLD_S + 34), radius=FOLD_R, fill=(0, 0, 0, 170))
-            blurred = shadow.filter(ImageFilter.GaussianBlur(30))
+            # A blue glow behind the device and a soft floor shadow under it; the device itself is the footage
+            cx, cy = FOLD_X + FOLD_S // 2, FOLD_Y + FOLD_S // 2
+            glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+            ImageDraw.Draw(glow).ellipse((cx - 470, cy - 360, cx + 470, cy + 360), fill=(20, 80, 220, 95))
+            glow = glow.filter(ImageFilter.GaussianBlur(120))
+            img.paste(glow, (0, 0), glow)
+            ImageDraw.Draw(shadow).ellipse((cx - 330, cy + 400, cx + 330, cy + 450), fill=(0, 0, 0, 200))
+            blurred = shadow.filter(ImageFilter.GaussianBlur(24))
             img.paste(blurred, (0, 0), blurred)
-            d = ImageDraw.Draw(img)
-            d.rounded_rectangle((FOLD_X, FOLD_Y, FOLD_X + FOLD_S, FOLD_Y + FOLD_S), radius=FOLD_R, fill=STAGE,
-                                outline=(70, 78, 98), width=3)
         else:
             ImageDraw.Draw(shadow).rounded_rectangle(
                 (SCR_X - BODY - 6, SCR_Y - BODY + 20, SCR_X + SCR_W + BODY + 6, SCR_Y + SCR_H + BODY + 32),
@@ -180,6 +182,9 @@ def build_scene(index, scene, audio, mask, frame):
     scene_card(scene, base)
     inputs = ["-loop", "1", "-t", f"{seconds}", "-framerate", f"{FPS}", "-i", base]
     graph, last, n = [], "0:v", 1
+    if card:   # a slow push-in so the title and closing cards aren't static
+        graph.append(f"[0:v]scale=w='{W}*(1+0.05*t/{seconds})':h=-2:eval=frame,crop={W}:{H}[zoom]")
+        last = "zoom"
     if kind == "fold":
         out = mv.BUILD / f"fg_{index:02d}.mp4"
         segs = scene["fold"]
@@ -195,14 +200,12 @@ def build_scene(index, scene, audio, mask, frame):
             f";{joined}concat=n={len(segs)}:v=1:a=0,setpts=PTS/{speed:.4f},fps={FPS},"
             f"tpad=stop_mode=clone:stop_duration={seconds},trim=duration={seconds:.3f}[out]"),
             "-map", "[out]", "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "16", "-pix_fmt", "yuv420p", out)
-        fmask = mv.BUILD / "mask_fold.png"
-        mv.screen_mask(fmask, FOLD_S, FOLD_S, FOLD_R)
-        inputs += ["-i", out, "-loop", "1", "-t", f"{seconds}", "-i", fmask]
+        inputs += ["-i", out]
         graph += [
-            f"[{n}:v]format=rgba[fg];[{n + 1}:v]format=gray[mk];[fg][mk]alphamerge[stage]",
-            f"[{last}][stage]overlay={FOLD_X}:{FOLD_Y}[framed]",
+            f"[{n}:v]format=rgba,colorkey={BG_KEY}:0.05:0.03[dev]",
+            f"[{last}][dev]overlay={FOLD_X}:{FOLD_Y}[framed]",
         ]
-        last, n = "framed", n + 2
+        last, n = "framed", n + 1
     elif not card:
         out = mv.BUILD / f"fg_{index:02d}.mp4"
         segs = scene["footage"]
