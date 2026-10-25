@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""VaultSpec Authenticator on iPhone Duo: a 1080×1920 launch video with narration, captions and music.
+"""VaultSpec Authenticator on iPhone Duo: a short 1080×1920 launch clip, music only.
 
   python marketing/video/duo/make_music.py        # once: the original background track
   python marketing/video/duo/make_duo_video.py
 
-Footage is in marketing/video/duo/work/rec: screen recordings of the outer display of the iPhone Duo
-simulator running the demo vault (nothing personal on screen). Narration is ElevenLabs when a key is
-available (see ../make_video.py), cached in duo/audio; otherwise a silent, captioned render. The music
-is mixed under the voice and ducks whenever the narrator speaks.
+The footage is duo-fold.mov, a Mac recording of the iPhone Duo simulator running the demo vault (nothing
+personal on screen): title card, the Duo folding and opening, closing card. No feature explanations, no
+narration and no captions; just the original music from make_music.py. A scene with a "say" line gets
+ElevenLabs narration and captions (see ../make_video.py), and the music then ducks under the voice.
 No store badge, price or donation link: the video only introduces the app on iPhone Duo.
 Layout: all text sits between about y=150 and y=1660 so Reels, Shorts and TikTok overlays don't cover it.
 Writes marketing/video/duo/VaultSpec-iPhone-Duo-launch.mp4.
@@ -38,55 +38,20 @@ BEZEL, RAIL = 13, 6
 BODY = BEZEL + RAIL
 # The fold scene shows the Mac recording of the simulator in a rounded stage panel instead of a device body
 FOLD_SRC = HERE / "duo-fold.mov"
-FOLD_S, FOLD_X, FOLD_Y, FOLD_R = 900, 90, 370, 52
+FOLD_S, FOLD_X, FOLD_Y, FOLD_R = 960, 60, 470, 52
 STAGE = (29, 29, 29)             # the recording's own background, so the crop blends into the panel
 
 SCENES = [
-    dict(
-        kind="title", headline="VaultSpec Authenticator",
-        say="This is VaultSpec Authenticator, built for iPhone Duo. "
-            "Your two-factor codes, encrypted on your device.",
-    ),
-    dict(
-        headline="Every code at a glance", eyebrow="YOUR CODES",
-        sub="One clean list with a live countdown",
-        chips=[("Live countdown", ACCENT), ("Tap to copy", GREEN), ("Works offline", VIOLET)],
-        say="All your two-factor codes in one clean list, with a live countdown. Tap a code to copy it.",
-        footage=[("duo-codes", 0.3, 12.0)],
-    ),
-    dict(
-        headline="Add any service", eyebrow="SET UP IN SECONDS",
-        sub="Scan a QR code or paste a setup link",
-        chips=[("QR or setup key", ACCENT), ("6 or 8 digits", VIOLET), ("SHA-1, 256, 512", GREEN)],
-        say="Adding an account takes seconds. Scan the QR code, or paste the setup link or key from any site.",
-        footage=[("duo-add", 0.4, 5.8)],
-    ),
-    dict(
-        headline="Locked down by default", eyebrow="SECURITY CONTROLS",
-        sub="You decide how and when it locks",
-        chips=[("Auto-Lock", AMBER), ("Block screenshots", GREEN), ("Tap to reveal", ACCENT)],
-        say="Choose when it auto-locks, block screenshots, and hide your codes until you tap them.",
-        footage=[("duo-add", 6.3, 10.1)],
-    ),
+    dict(kind="title", headline="VaultSpec Authenticator", seconds=4.2),
     dict(
         kind="fold", headline="Fits your Duo", eyebrow="IPHONE DUO",
-        sub="Fold it, open it, rotate it",
-        chips=[("Upright: one column", ACCENT), ("Open: a full grid", GREEN), ("Any orientation", VIOLET)],
-        say="On iPhone Duo, VaultSpec fits the way you hold it. Held upright, you get a clean single column. "
-            "Turn it, open it up, and your codes spread out into a grid.",
+        sub="Fold it, open it, rotate it", seconds=12.5,
         # (start, end, centre x, centre y, side) in the 2452x1668 Mac recording; the cuts skip the
         # fold transitions, where the screen goes black, and the stretches with the mouse pointer.
         fold=[(1.5, 2.8, 1222, 860, 950), (17.5, 21.5, 1222, 862, 1290),
               (9.4, 11.0, 1222, 856, 1290), (36.8, 40.0, 1222, 856, 1290)],
     ),
-    dict(
-        kind="outro", headline="VaultSpec Authenticator",
-        say="VaultSpec Authenticator. Two-factor codes, encrypted on your device, "
-            "and built for iPhone Duo. Learn more at vaultspec dot in.",
-        caption="VaultSpec Authenticator. Two-factor codes, encrypted on your device, "
-                "and built for iPhone Duo. Learn more at vaultspec.in.",
-        hold=1.0,
-    ),
+    dict(kind="outro", headline="VaultSpec Authenticator", seconds=5.0),
 ]
 
 
@@ -154,8 +119,6 @@ def scene_card(scene, path):
         pw = d.textlength(pill, font=f) + 72
         d.rounded_rectangle(((W - pw) / 2, 1020, (W + pw) / 2, 1096), radius=38, fill=ACCENT)
         mv.centered(d, 1038, pill, f, WHITE)
-        mv.centered(d, 1160, "Two-factor codes,", mv.font("medium", 44), GRAY)
-        mv.centered(d, 1218, "encrypted on your device", mv.font("medium", 44), GRAY)
     elif kind == "outro":
         icon = mv.app_icon(220)
         img.paste(icon, ((W - 220) // 2, 360), icon)
@@ -164,7 +127,6 @@ def scene_card(scene, path):
         d.rounded_rectangle((110, 860, W - 110, 1090), radius=44, fill=(28, 28, 32))
         mv.centered(d, 904, "LEARN MORE", mv.font("semibold", 30), ACCENT)
         mv.centered(d, 962, "vaultspec.in", mv.font("bold", 82), WHITE)
-        chip_row(d, 1160, [("Open source", ACCENT), ("Encrypted", GREEN), ("Works offline", VIOLET)])
     else:
         mv.centered(d, 150, f"VAULTSPEC  ·  {scene['eyebrow']}", mv.font("semibold", 28), ACCENT)
         mv.centered(d, 198, scene["headline"], mv.font("bold", 74), WHITE)
@@ -178,14 +140,12 @@ def scene_card(scene, path):
             d = ImageDraw.Draw(img)
             d.rounded_rectangle((FOLD_X, FOLD_Y, FOLD_X + FOLD_S, FOLD_Y + FOLD_S), radius=FOLD_R, fill=STAGE,
                                 outline=(70, 78, 98), width=3)
-            chip_row(d, FOLD_Y + FOLD_S + 38, scene["chips"])
         else:
             ImageDraw.Draw(shadow).rounded_rectangle(
                 (SCR_X - BODY - 6, SCR_Y - BODY + 20, SCR_X + SCR_W + BODY + 6, SCR_Y + SCR_H + BODY + 32),
                 radius=SCR_R + BODY, fill=(0, 0, 0, 170))
             blurred = shadow.filter(ImageFilter.GaussianBlur(30))
             img.paste(blurred, (0, 0), blurred)
-            chip_row(d, SCR_Y + SCR_H + BODY + 34, scene["chips"])
     img.save(path)
 
 
@@ -210,8 +170,11 @@ def device_frame(path):
 def build_scene(index, scene, audio, mask, frame):
     kind = scene.get("kind", "phone")
     card = kind in ("title", "outro")
-    speech = mv.duration(audio) if audio else len(scene["say"].split()) / mv.WORDS_PER_SECOND
-    seconds = round(LEAD + speech + TAIL + scene.get("hold", 0), 2)
+    if scene.get("say"):
+        speech = mv.duration(audio) if audio else len(scene["say"].split()) / mv.WORDS_PER_SECOND
+        seconds = round(LEAD + speech + TAIL + scene.get("hold", 0), 2)
+    else:
+        speech, seconds = 0, scene["seconds"]
 
     base = mv.BUILD / f"card_{index:02d}.png"
     scene_card(scene, base)
@@ -262,7 +225,7 @@ def build_scene(index, scene, audio, mask, frame):
         ]
         last, n = "framed", n + 3
 
-    for c, (text, start, end) in enumerate(caption_chunks(scene.get("caption", scene["say"]), speech)):
+    for c, (text, start, end) in enumerate(caption_chunks(scene.get("caption", scene["say"]), speech) if scene.get("say") else []):
         png = mv.BUILD / f"cap_{index:02d}_{c:02d}.png"
         caption_image(text, png, card)
         inputs += ["-loop", "1", "-t", f"{seconds}", "-i", png]
@@ -287,11 +250,12 @@ def build_scene(index, scene, audio, mask, frame):
 def main():
     mv.BUILD.mkdir(parents=True, exist_ok=True)
     key = mv.api_key()
-    audio = [mv.narration(i, s["say"], key) for i, s in enumerate(SCENES)]
-    voiced = all(audio)
-    if not voiced:
+    audio = [mv.narration(i, s["say"], key) if s.get("say") else None for i, s in enumerate(SCENES)]
+    voiced = any(s.get("say") for s in SCENES)
+    if voiced and not all(a for a, s in zip(audio, SCENES) if s.get("say")):
         audio = [None] * len(SCENES)
-        print("No ElevenLabs key and no cached narration: rendering a silent, captioned video.")
+        voiced = False
+        print("No ElevenLabs key and no cached narration: rendering without a voice.")
 
     mask, frame = mv.BUILD / "mask.png", mv.BUILD / "frame.png"
     mv.screen_mask(mask, SCR_W, SCR_H, SCR_R)
@@ -314,9 +278,15 @@ def main():
         )
         mv.run("-i", joined, "-i", MUSIC, "-filter_complex", graph, "-map", "0:v", "-map", "[a]",
                "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-movflags", "+faststart", OUTPUT)
+    elif MUSIC.exists():
+        # No voice: the music is the whole soundtrack, faded in and out and levelled for streaming
+        graph = (f"[1:a]atrim=duration={total:.2f},asetpts=PTS-STARTPTS,afade=t=in:d=1.0,"
+                 f"afade=t=out:st={total - 3:.2f}:d=3,loudnorm=I=-16:TP=-1.5:LRA=11[a]")
+        mv.run("-i", joined, "-i", MUSIC, "-filter_complex", graph, "-map", "0:v", "-map", "[a]",
+               "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-movflags", "+faststart", OUTPUT)
     else:
         mv.run("-i", joined, "-c", "copy", "-movflags", "+faststart", OUTPUT)
-    print(f"{OUTPUT.name}  {total:.0f}s  {'with narration and music' if voiced and MUSIC.exists() else 'no music'}")
+    print(f"{OUTPUT.name}  {total:.0f}s  {'with narration and music' if voiced and MUSIC.exists() else 'music only' if MUSIC.exists() else 'no music'}")
 
 
 if __name__ == "__main__":
