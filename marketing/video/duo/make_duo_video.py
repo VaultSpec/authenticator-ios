@@ -42,16 +42,20 @@ FOLD_S, FOLD_X, FOLD_Y, FOLD_R = 960, 60, 470, 52
 BG_KEY = "0x1d1d1d"             # the recording's flat background colour; keyed out so the device floats
 
 SCENES = [
-    dict(kind="title", headline="VaultSpec Authenticator", seconds=4.2),
+    dict(kind="title", headline="VaultSpec Authenticator", min_seconds=4.0,
+         say="VaultSpec Authenticator. Built for iPhone Duo."),
     dict(
         kind="fold", headline="Fits your Duo", eyebrow="IPHONE DUO",
-        sub="Fold it, open it, rotate it", seconds=12.5,
+        sub="Fold it, open it, rotate it", min_seconds=12.0,
+        say="Fold it, open it, rotate it. VaultSpec fits your Duo.",
         # (start, end, centre x, centre y, side) in the 2452x1668 Mac recording; the cuts skip the
         # fold transitions, where the screen goes black, and the stretches with the mouse pointer.
         fold=[(1.5, 2.8, 1222, 860, 950), (17.5, 21.5, 1222, 862, 1290),
               (9.4, 11.0, 1222, 856, 1290), (36.8, 40.0, 1222, 856, 1290)],
     ),
-    dict(kind="outro", headline="VaultSpec Authenticator", seconds=5.0),
+    dict(kind="outro", headline="VaultSpec Authenticator", hold=1.6,
+         say="Coming tomorrow. Learn more at vaultspec dot in.",
+         caption="Coming tomorrow. Learn more at vaultspec.in."),
 ]
 
 
@@ -121,12 +125,16 @@ def scene_card(scene, path):
         mv.centered(d, 1038, pill, f, WHITE)
     elif kind == "outro":
         icon = mv.app_icon(220)
-        img.paste(icon, ((W - 220) // 2, 360), icon)
-        mv.centered(d, 620, "VaultSpec", mv.font("bold", 84), WHITE)
-        mv.centered(d, 718, "Authenticator", mv.font("medium", 52), GRAY)
-        d.rounded_rectangle((110, 860, W - 110, 1090), radius=44, fill=(28, 28, 32))
-        mv.centered(d, 904, "LEARN MORE", mv.font("semibold", 30), ACCENT)
-        mv.centered(d, 962, "vaultspec.in", mv.font("bold", 82), WHITE)
+        img.paste(icon, ((W - 220) // 2, 330), icon)
+        mv.centered(d, 590, "VaultSpec", mv.font("bold", 84), WHITE)
+        mv.centered(d, 688, "Authenticator", mv.font("medium", 52), GRAY)
+        pill, f = "COMING TOMORROW", mv.font("semibold", 34)
+        pw = d.textlength(pill, font=f) + 80
+        d.rounded_rectangle(((W - pw) / 2, 800, (W + pw) / 2, 880), radius=40, fill=ACCENT)
+        mv.centered(d, 819, pill, f, WHITE)
+        d.rounded_rectangle((110, 960, W - 110, 1190), radius=44, fill=(28, 28, 32))
+        mv.centered(d, 1004, "LEARN MORE", mv.font("semibold", 30), ACCENT)
+        mv.centered(d, 1062, "vaultspec.in", mv.font("bold", 82), WHITE)
     else:
         mv.centered(d, 150, f"VAULTSPEC  ·  {scene['eyebrow']}", mv.font("semibold", 28), ACCENT)
         mv.centered(d, 198, scene["headline"], mv.font("bold", 74), WHITE)
@@ -174,7 +182,7 @@ def build_scene(index, scene, audio, mask, frame):
     card = kind in ("title", "outro")
     if scene.get("say"):
         speech = mv.duration(audio) if audio else len(scene["say"].split()) / mv.WORDS_PER_SECOND
-        seconds = round(LEAD + speech + TAIL + scene.get("hold", 0), 2)
+        seconds = round(max(LEAD + speech + TAIL + scene.get("hold", 0), scene.get("min_seconds", 0)), 2)
     else:
         speech, seconds = 0, scene["seconds"]
 
@@ -275,7 +283,8 @@ def main():
         # Music under the voice: the narration (level-matched) triggers a sidechain that ducks the music
         graph = (
             "[0:a]loudnorm=I=-16:TP=-1.5:LRA=11,asplit=2[voice][key];"
-            f"[1:a]atrim=duration={total:.2f},asetpts=PTS-STARTPTS,volume=0.36[mus];"
+            f"[1:a]atrim=duration={total:.2f},asetpts=PTS-STARTPTS,volume=0.62,"
+            f"afade=t=in:d=1.0,afade=t=out:st={total - 3:.2f}:d=3[mus];"
             "[mus][key]sidechaincompress=threshold=0.02:ratio=9:attack=25:release=500:makeup=1[duck];"
             "[duck][voice]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.95[a]"
         )
