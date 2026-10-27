@@ -9,6 +9,7 @@ struct HomeView: View {
     @State private var category = Account.defaultCategory
     @State private var showingAdd = false
     @State private var showingSettings = false
+    @State private var showingConnect = false
     @State private var toast: String?
     @State private var copies = 0
     @State private var pendingDelete: Account?
@@ -87,12 +88,14 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showingAdd) { AddAccountView().presentationSizing(.form) }
             .sheet(isPresented: $showingSettings) { SettingsView().presentationSizing(.form) }
+            .sheet(isPresented: $showingConnect) { ShowPairingCodeView().presentationSizing(.form) }
             #if DEBUG
             // `-screen settings|add` opens that sheet on launch, for App Store screenshots
             .task {
                 switch UserDefaults.standard.string(forKey: "screen") {
                 case "settings": showingSettings = true
                 case "add": showingAdd = true
+                case "connect": showingConnect = true
                 default: break
                 }
             }

@@ -4,7 +4,7 @@ import SwiftUI
 /// SwiftUI copies a Section's modifiers onto each of its rows, so a sheet or dialog attached to the
 /// section is presented several times at once, and UIKit then dismisses Settings.
 enum CloudSheet: String, Identifiable {
-    case signIn, enable, restore, delete
+    case signIn, enable, restore, connect, delete
     var id: String { rawValue }
 }
 
@@ -45,6 +45,7 @@ struct CloudBackupSection: View {
                     }
                 }
 
+                Button("Connect a Device", systemImage: "qrcode") { sheet = .connect }
                 Button("Restore from Cloud", systemImage: "arrow.down.circle") { sheet = .restore }
                 Button("Sign Out", systemImage: "rectangle.portrait.and.arrow.right") { confirmingSignOut = true }
                 Button("Delete Cloud Account", systemImage: "person.crop.circle.badge.xmark", role: .destructive) {
@@ -72,6 +73,7 @@ struct CloudBackupSection: View {
         case .signIn: CloudSignInView()
         case .enable: EnableCloudBackupView()
         case .restore: CloudRestoreView(mode: .merge)
+        case .connect: ShowPairingCodeView()
         case .delete:
             PasswordPromptView(
                 title: "Delete Cloud Account",

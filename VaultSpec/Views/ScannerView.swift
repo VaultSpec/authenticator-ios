@@ -12,7 +12,7 @@ struct ScannerView: View {
     var body: some View {
         ZStack(alignment: .top) {
             if QRScanner.isAvailable {
-                QRScanner(onScan: onScan).ignoresSafeArea()
+                QRScanner(accepts: { $0.lowercased().hasPrefix("otpauth://") }, onScan: onScan).ignoresSafeArea()
 
                 RoundedRectangle(cornerRadius: 36, style: .continuous)
                     .strokeBorder(.white.opacity(0.9), lineWidth: 3)
@@ -45,16 +45,19 @@ struct ScannerView: View {
 
 #if targetEnvironment(macCatalyst)
 /// VisionKit's live scanner is not available on the Mac.
-private struct QRScanner: View {
+struct QRScanner: View {
     static let isAvailable = false
     static let isSupported = false
+    let accepts: (String) -> Bool
     let onScan: (String) -> Void
     var body: some View { EmptyView() }
 }
 #else
-private struct QRScanner: UIViewControllerRepresentable {
+/// The live camera feed, reporting the first QR code that [accepts] approves.
+struct QRScanner: UIViewControllerRepresentable {
     static var isAvailable: Bool { DataScannerViewController.isSupported && DataScannerViewController.isAvailable }
     static var isSupported: Bool { DataScannerViewController.isSupported }
+    let accepts: (String) -> Bool
     let onScan: (String) -> Void
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
@@ -70,17 +73,21 @@ private struct QRScanner: UIViewControllerRepresentable {
 
     func updateUIViewController(_ controller: DataScannerViewController, context: Context) {}
 
-    func makeCoordinator() -> Coordinator { Coordinator(onScan: onScan) }
+    func makeCoordinator() -> Coordinator { Coordinator(accepts: accepts, onScan: onScan) }
 
     final class Coordinator: NSObject, DataScannerViewControllerDelegate {
+        let accepts: (String) -> Bool
         let onScan: (String) -> Void
         private var handled = false
 
-        init(onScan: @escaping (String) -> Void) { self.onScan = onScan }
+        init(accepts: @escaping (String) -> Bool, onScan: @escaping (String) -> Void) {
+            self.accepts = accepts
+            self.onScan = onScan
+        }
 
         func dataScanner(_ scanner: DataScannerViewController, didAdd items: [RecognizedItem], allItems: [RecognizedItem]) {
             for case .barcode(let barcode) in items {
-                guard !handled, let value = barcode.payloadStringValue, value.lowercased().hasPrefix("otpauth://") else { continue }
+                guard !handled, let value = barcode.payloadStringValue, accepts(value) else { continue }
                 handled = true
                 scanner.stopScanning()
                 onScan(value)

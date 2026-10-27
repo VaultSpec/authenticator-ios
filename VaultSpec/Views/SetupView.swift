@@ -11,6 +11,7 @@ struct SetupView: View {
     @State private var error: String?
     @State private var working = false
     @State private var showingRestore = false
+    @State private var showingConnect = false
     @State private var restored: RestoredBackup?
     @FocusState private var focused: Field?
 
@@ -58,6 +59,12 @@ struct SetupView: View {
                     Button("Restore from VaultSpec Cloud", systemImage: "arrow.down.circle") { showingRestore = true }
                         .buttonStyle(.glass)
                         .controlSize(.large)
+
+                    if ScanToConnectView.isSupported {
+                        Button("Use Another Device", systemImage: "qrcode.viewfinder") { showingConnect = true }
+                            .buttonStyle(.glass)
+                            .controlSize(.large)
+                    }
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -68,6 +75,12 @@ struct SetupView: View {
             CloudRestoreView(mode: .newVault) { restored = $0 }
                 .presentationSizing(.form)
         }
+        .fullScreenCover(isPresented: $showingConnect, onDismiss: finishRestore) {
+            ScanToConnectView { restored = $0 }
+        }
+        #if DEBUG
+        .task { if UserDefaults.standard.string(forKey: "screen") == "scan" { showingConnect = true } }
+        #endif
     }
 
     private var fields: some View {
@@ -124,7 +137,7 @@ struct SetupView: View {
         }
     }
 
-    /// Runs once the restore sheet has closed: the backup's vault password becomes this vault's.
+    /// Runs once the restore or connect sheet has closed: the backup's vault password becomes this vault's.
     private func finishRestore() {
         guard let backup = restored else { return }
         restored = nil

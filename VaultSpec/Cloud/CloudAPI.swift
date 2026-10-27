@@ -122,6 +122,37 @@ actor CloudAPI {
         }
     }
 
+    // MARK: Scan & Connect
+
+    nonisolated struct Pairing: Codable, Sendable {
+        let id: String
+        let token: String
+        let expiresAt: String
+    }
+
+    /// Uploads a one-time snapshot for a new device and returns the token to show as a QR code.
+    func startPairing(keyId: String, payload: String) async throws -> Pairing {
+        try decode(Pairing.self, try await authorized("POST", "/v1/pairing", body: ["keyId": keyId, "payload": payload]))
+    }
+
+    /// "pending", "claimed" or "expired".
+    func pairingStatus(id: String) async throws -> String {
+        struct Response: Decodable { let status: String }
+        return try decode(Response.self, try await authorized("GET", "/v1/pairing/\(id)")).status
+    }
+
+    func cancelPairing(id: String) async {
+        _ = try? await authorized("DELETE", "/v1/pairing/\(id)")
+    }
+
+    /// The new device: claims the scanned token, signs in to the same account and returns the snapshot.
+    func claimPairing(token: String, deviceName: String) async throws -> String {
+        struct Response: Decodable { let email: String; let payload: String; let accessToken: String; let refreshToken: String }
+        let response = try decode(Response.self, try await send("POST", "/v1/pairing/claim", body: ["token": token, "deviceName": deviceName]))
+        store(Session(email: response.email, accessToken: response.accessToken, refreshToken: response.refreshToken))
+        return response.payload
+    }
+
     // MARK: Transport
 
     private func store(_ session: Session?) {

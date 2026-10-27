@@ -162,6 +162,49 @@ final class CloudStore {
         setEnabled(true)
     }
 
+    // MARK: Scan & Connect
+
+    /// The text a pairing QR code carries.
+    static let pairingPrefix = "vaultspec://pair/"
+
+    /// Starts a pairing with a snapshot of [accounts]. Uses the backup key when cloud backup is on,
+    /// otherwise derives one from [vaultPassword] (already checked against the vault) without keeping it.
+    func startPairing(accounts: [Account], vaultPassword: String?) async throws -> (id: String, code: String) {
+        let key: BackupFormat.Key
+        if let stored = Keychain.read(.cloudKey), let saved = try? JSONDecoder().decode(BackupFormat.Key.self, from: stored) {
+            key = saved
+        } else if let vaultPassword {
+            key = try await Task.detached(priority: .userInitiated) { try BackupFormat.deriveKey(password: vaultPassword) }.value
+        } else {
+            throw CloudError.notEnabled
+        }
+        let payload = try BackupFormat.encrypt(accounts, with: key)
+        let pairing = try await api.startPairing(keyId: key.keyId, payload: String(decoding: try JSONEncoder().encode(payload), as: UTF8.self))
+        return (pairing.id, Self.pairingPrefix + pairing.token)
+    }
+
+    /// Whether this device can show a pairing code without asking for the vault password.
+    var hasBackupKey: Bool { Keychain.read(.cloudKey) != nil }
+
+    func pairingStatus(id: String) async throws -> String {
+        try await api.pairingStatus(id: id)
+    }
+
+    func cancelPairing(id: String) async {
+        await api.cancelPairing(id: id)
+    }
+
+    /// The new device: claims a scanned code. Signs in to the other device's account and returns its vault.
+    func claimPairing(code: String) async throws -> BackupPayload {
+        let token = String(code.dropFirst(Self.pairingPrefix.count))
+        let json = try await api.claimPairing(token: token, deviceName: UIDevice.current.name)
+        email = await api.email
+        guard let payload = try? JSONDecoder().decode(BackupPayload.self, from: Data(json.utf8)) else {
+            throw BackupFormat.FormatError.unreadable
+        }
+        return payload
+    }
+
     // MARK: Private
 
     private func storeKey(for password: String) async throws {
