@@ -45,7 +45,7 @@ nonisolated enum PairingCode {
     /// Reads a code from an 8-bit luma frame (a camera's Y plane), light on dark or dark on light, assuming it is roughly in the middle
     /// and facing the camera. Returns the token as base64url, or nil if no valid code was found.
     static func decode(luma: UnsafePointer<UInt8>, width: Int, height: Int, rowBytes: Int) -> String? {
-        let image = Gray.downsample(luma: luma, width: width, height: height, rowBytes: rowBytes, target: 480)
+        let image = Gray.downsample(luma: luma, width: width, height: height, rowBytes: rowBytes, target: 360)
         return decode(image)
     }
 

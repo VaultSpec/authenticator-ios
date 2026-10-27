@@ -7,6 +7,12 @@ import Testing
 struct PairingCodeTests {
     private let token = "q1w2e3r4t5y6u7i8"
 
+    /// Decodes the way the camera does: from an 8-bit luma frame.
+    private func decodeFrame(_ g: PairingCode.Gray) -> String? {
+        let bytes = g.pixels.map { UInt8(min(255, max(0, $0 * 255))) }
+        return bytes.withUnsafeBufferPointer { PairingCode.decode(luma: $0.baseAddress!, width: g.width, height: g.height, rowBytes: g.width) }
+    }
+
     /// The cloud [side] pixels wide in a camera-sized [frame], after rotating, moving, blurring and adding noise.
     private func frame(side: CGFloat, rotation: Double, time: Double, frame: CGSize, offset: CGPoint, blur: Double, noise: Double,
                        brightness: Double = 1, dark: Bool = false) -> PairingCode.Gray {
@@ -46,19 +52,19 @@ struct PairingCodeTests {
             let t = rotation + Double(k) * 0.1
             let image = frame(side: side, rotation: t, time: t * 3, frame: CGSize(width: 1280, height: 720),
                               offset: CGPoint(x: shift, y: -shift / 2), blur: blur, noise: noise)
-            return PairingCode.decode(image) == token
+            return decodeFrame(image) == token
         }.count
         #expect(read >= 3, "read \(read) of 5 frames")
     }
 
     @Test func decodesTheDarkModeCloud() {
         let image = frame(side: 520, rotation: 2.4, time: 3, frame: CGSize(width: 1280, height: 720), offset: CGPoint(x: -12, y: 8), blur: 1, noise: 0.04, dark: true)
-        #expect(PairingCode.decode(image) == token)
+        #expect(decodeFrame(image) == token)
     }
 
     @Test func decodesADimScreen() {
         let image = frame(side: 500, rotation: 0.7, time: 1, frame: CGSize(width: 1280, height: 720), offset: .zero, blur: 1, noise: 0.03, brightness: 0.45)
-        #expect(PairingCode.decode(image) == token)
+        #expect(decodeFrame(image) == token)
     }
 
     @Test func rejectsAnEmptyFrame() {

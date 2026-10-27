@@ -35,10 +35,18 @@ struct PairingScanner: UIViewRepresentable {
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
     }
 
+    /// Three queues, so nothing waits on anything else: the session is started and stopped on
+    /// `sessionQueue`, frames arrive on `frameQueue` and are only copied there, and the slow decoding
+    /// runs on `decodeQueue`, which takes the newest frame whenever it's free. (Stopping the session
+    /// from the frame callback itself deadlocks: stopRunning waits for that very callback.)
     final class Coordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
         private let onToken: (String) -> Void
         private let session = AVCaptureSession()
-        private let queue = DispatchQueue(label: "vaultspec.pairing-scanner")
+        private let sessionQueue = DispatchQueue(label: "vaultspec.pairing-scanner.session")
+        private let frameQueue = DispatchQueue(label: "vaultspec.pairing-scanner.frames")
+        private let decodeQueue = DispatchQueue(label: "vaultspec.pairing-scanner.decode", qos: .utility)
+        private let lock = NSLock()
+        private var decoding = false
         private var found = false
 
         init(onToken: @escaping (String) -> Void) { self.onToken = onToken }
@@ -47,10 +55,10 @@ struct PairingScanner: UIViewRepresentable {
             view.previewLayer.session = session
             switch AVCaptureDevice.authorizationStatus(for: .video) {
             case .authorized:
-                queue.async { self.configure() }
+                sessionQueue.async { self.configure() }
             case .notDetermined:
                 AVCaptureDevice.requestAccess(for: .video) { granted in
-                    if granted { self.queue.async { self.configure() } }
+                    if granted { self.sessionQueue.async { self.configure() } }
                 }
             default:
                 break
@@ -67,7 +75,7 @@ struct PairingScanner: UIViewRepresentable {
             let output = AVCaptureVideoDataOutput()
             output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange]
             output.alwaysDiscardsLateVideoFrames = true
-            output.setSampleBufferDelegate(self, queue: queue)
+            output.setSampleBufferDelegate(self, queue: frameQueue)
             if session.canAddOutput(output) { session.addOutput(output) }
             session.commitConfiguration()
             if (try? camera.lockForConfiguration()) != nil {
@@ -78,24 +86,39 @@ struct PairingScanner: UIViewRepresentable {
         }
 
         func stop() {
-            queue.async { [session] in session.stopRunning() }
+            sessionQueue.async { [session] in session.stopRunning() }
         }
 
+        /// Copies the luma plane and hands it to the decoder unless it's still busy with an earlier frame.
         func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-            guard !found, let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+            lock.lock()
+            let busy = decoding || found
+            if !busy { decoding = true }
+            lock.unlock()
+            guard !busy, let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
             CVPixelBufferLockBaseAddress(buffer, .readOnly)
-            defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
-            guard let base = CVPixelBufferGetBaseAddressOfPlane(buffer, 0) else { return }
-            let token = PairingCode.decode(
-                luma: base.assumingMemoryBound(to: UInt8.self),
-                width: CVPixelBufferGetWidthOfPlane(buffer, 0),
-                height: CVPixelBufferGetHeightOfPlane(buffer, 0),
-                rowBytes: CVPixelBufferGetBytesPerRowOfPlane(buffer, 0)
-            )
-            guard let token else { return }
-            found = true
-            session.stopRunning()
-            DispatchQueue.main.async { self.onToken(token) }
+            let width = CVPixelBufferGetWidthOfPlane(buffer, 0), height = CVPixelBufferGetHeightOfPlane(buffer, 0)
+            let rowBytes = CVPixelBufferGetBytesPerRowOfPlane(buffer, 0)
+            var luma = [UInt8](repeating: 0, count: rowBytes * height)
+            if let base = CVPixelBufferGetBaseAddressOfPlane(buffer, 0) {
+                luma.withUnsafeMutableBytes { $0.copyMemory(from: UnsafeRawBufferPointer(start: base, count: rowBytes * height)) }
+            }
+            CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
+
+            decodeQueue.async { [self] in
+                let token = luma.withUnsafeBufferPointer {
+                    PairingCode.decode(luma: $0.baseAddress!, width: width, height: height, rowBytes: rowBytes)
+                }
+                lock.lock()
+                decoding = false
+                let first = token != nil && !found
+                if first { found = true }
+                lock.unlock()
+                guard first, let token else { return }
+                stop()
+                DispatchQueue.main.async { self.onToken(token) }
+            }
         }
     }
 }
