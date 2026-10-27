@@ -66,7 +66,7 @@ struct CloudRestoreView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingSignIn) { CloudSignInView() }
+            .sheet(isPresented: $showingSignIn) { CloudSignInView().presentationSizing(.form) }
             .task(id: cloud.email) { await load() }
         }
     }

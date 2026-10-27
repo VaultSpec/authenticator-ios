@@ -85,8 +85,8 @@ struct HomeView: View {
                         .keyboardShortcut("n")
                 }
             }
-            .sheet(isPresented: $showingAdd) { AddAccountView() }
-            .sheet(isPresented: $showingSettings) { SettingsView() }
+            .sheet(isPresented: $showingAdd) { AddAccountView().presentationSizing(.form) }
+            .sheet(isPresented: $showingSettings) { SettingsView().presentationSizing(.form) }
             #if DEBUG
             // `-screen settings|add` opens that sheet on launch, for App Store screenshots
             .task {

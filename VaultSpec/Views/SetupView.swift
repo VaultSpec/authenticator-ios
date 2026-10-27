@@ -66,6 +66,7 @@ struct SetupView: View {
         }
         .sheet(isPresented: $showingRestore, onDismiss: finishRestore) {
             CloudRestoreView(mode: .newVault) { restored = $0 }
+                .presentationSizing(.form)
         }
     }
 

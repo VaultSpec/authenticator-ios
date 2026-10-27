@@ -85,8 +85,8 @@ struct SettingsView: View {
                     Button("Done", systemImage: "checkmark") { dismiss() }
                 }
             }
-            .sheet(isPresented: $showingPassword) { ChangePasswordView() }
-            .sheet(item: $cloudSheet) { CloudBackupSection.content(for: $0, cloud: cloud) }
+            .sheet(isPresented: $showingPassword) { ChangePasswordView().presentationSizing(.form) }
+            .sheet(item: $cloudSheet) { CloudBackupSection.content(for: $0, cloud: cloud).presentationSizing(.form) }
             .confirmationDialog("Sign out of VaultSpec Cloud?", isPresented: $confirmingSignOut, titleVisibility: .visible) {
                 Button("Sign Out", role: .destructive) {
                     Task { await cloud.signOut() }
