@@ -3,6 +3,7 @@ import SwiftUI
 /// Add an account by scanning its QR code, pasting an otpauth link, or typing the setup key.
 struct AddAccountView: View {
     @Environment(VaultStore.self) private var vault
+    @Environment(AppSettings.self) private var settings
     @Environment(\.dismiss) private var dismiss
 
     @State private var issuer = ""
@@ -14,6 +15,9 @@ struct AddAccountView: View {
     @State private var category = Account.defaultCategory
     @State private var error: String?
     @State private var showingScanner = false
+    @State private var namingCategory = false
+    @State private var newCategory = ""
+    @Namespace private var chips
 
     var body: some View {
         NavigationStack {
@@ -58,11 +62,14 @@ struct AddAccountView: View {
                         .font(.body.monospaced())
                 }
 
-                Section("Category") {
-                    Picker("Category", selection: $category) {
-                        ForEach(Account.categories, id: \.self, content: Text.init)
-                    }
-                    .pickerStyle(.segmented)
+                Section {
+                    categoryChips
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                } header: {
+                    Text("Category")
+                } footer: {
+                    Text("Optional. Every account also shows under All.")
                 }
 
                 Section("Advanced") {
@@ -97,11 +104,71 @@ struct AddAccountView: View {
                         .disabled(secret.isEmpty)
                 }
             }
+            .alert("New Category", isPresented: $namingCategory) {
+                TextField("Name", text: $newCategory)
+                    .textInputAutocapitalization(.words)
+                Button("Cancel", role: .cancel) {}
+                Button("Add") {
+                    if let name = settings.addCategory(newCategory) {
+                        withAnimation(.smooth) { category = name }
+                    }
+                }
+            } message: {
+                Text("Name a category to group accounts. It's saved for next time.")
+            }
             .sheet(isPresented: $showingScanner) {
                 ScannerView { link in
                     showingScanner = false
                     use(link)
                 }
+            }
+        }
+    }
+
+    /// The categories as glass chips, like the home screen's; "All" is a filter there, not a choice here.
+    /// Tapping the chosen chip again leaves the account uncategorized.
+    private var categoryChips: some View {
+        GlassEffectContainer(spacing: 8) {
+            FlowLayout(spacing: 8) {
+                ForEach(settings.categories(for: vault.accounts).filter { $0 != Account.defaultCategory }, id: \.self) { name in
+                    let selected = name == category
+                    Button {
+                        withAnimation(.smooth) { category = selected ? Account.defaultCategory : name }
+                    } label: {
+                        HStack(spacing: 6) {
+                            if selected {
+                                Image(systemName: "checkmark").font(.caption.weight(.bold)).transition(.scale.combined(with: .opacity))
+                            }
+                            Text(name)
+                        }
+                            .fixedSize()
+                            .font(.subheadline.weight(selected ? .semibold : .medium))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 9)
+                            .foregroundStyle(selected ? .white : .primary)
+                    }
+                    .buttonStyle(.plain)
+                    .glassEffect(selected ? .regular.tint(.accentColor).interactive() : .regular.interactive(), in: .capsule)
+                    .glassEffectID(name, in: chips)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                }
+                Button {
+                    newCategory = ""
+                    namingCategory = true
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "plus").font(.caption.weight(.bold))
+                        Text("New")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .fixedSize()
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .foregroundStyle(.tint)
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.tint(.accentColor.opacity(0.18)).interactive(), in: .capsule)
+                .accessibilityLabel("New Category")
             }
         }
     }
@@ -146,5 +213,45 @@ struct AddAccountView: View {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+}
+
+/// Lays its children out in rows, wrapping to the next row when one is full.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(subviews, width: proposal.width ?? .infinity)
+        return CGSize(width: proposal.width ?? rows.map(\.width).max() ?? 0, height: rows.last.map { $0.y + $0.height } ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for row in arrange(subviews, width: bounds.width) {
+            var x = bounds.minX
+            for index in row.items {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: bounds.minY + row.y), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+        }
+    }
+
+    private struct Row { var items: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0; var y: CGFloat = 0 }
+
+    private func arrange(_ subviews: Subviews, width: CGFloat) -> [Row] {
+        var rows = [Row()]
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            if !rows[rows.count - 1].items.isEmpty, rows[rows.count - 1].width + spacing + size.width > width {
+                let last = rows[rows.count - 1]
+                rows.append(Row(y: last.y + last.height + spacing))
+            }
+            var row = rows[rows.count - 1]
+            row.width += (row.items.isEmpty ? 0 : spacing) + size.width
+            row.height = max(row.height, size.height)
+            row.items.append(index)
+            rows[rows.count - 1] = row
+        }
+        return rows
     }
 }

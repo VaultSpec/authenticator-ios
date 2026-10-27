@@ -19,6 +19,8 @@ final class AppSettings {
     /// the vault locks. 0 locks as soon as it's away.
     var autoLockSeconds: Int { didSet { defaults.set(autoLockSeconds, forKey: Keys.autoLockSeconds) } }
     private(set) var lastPasswordUnlock: Date?
+    /// Categories the user named, in the order they were added. Built-in ones are in `Account.categories`.
+    private(set) var customCategories: [String]
 
     let revealSeconds: TimeInterval = 30
     /// The screenshot shield relies on iOS's secure text field; it isn't used on the Mac.
@@ -39,6 +41,7 @@ final class AppSettings {
         static let reminderDays = "behavior.passwordReminderDays"
         static let autoLockSeconds = "security.autoLockSeconds"
         static let lastPasswordUnlock = "behavior.lastPasswordUnlock"
+        static let customCategories = "categories.custom"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -56,6 +59,35 @@ final class AppSettings {
         autoLockSeconds = lockAfter.flatMap { s in Self.autoLockChoices.contains { $0.seconds == s } ? s : nil }
             ?? Self.defaultAutoLockSeconds
         lastPasswordUnlock = defaults.object(forKey: Keys.lastPasswordUnlock) as? Date
+        customCategories = defaults.stringArray(forKey: Keys.customCategories) ?? []
+    }
+
+    // MARK: Categories
+
+    static let maxCategoryLength = 24
+
+    /// Every category to offer: All, the built-in ones, the user's own, then any that only exist on
+    /// accounts (restored from a backup made elsewhere, for example).
+    func categories(for accounts: [Account]) -> [String] {
+        var names = Account.categories
+        for name in customCategories + accounts.map(\.category) where !names.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
+            names.append(name)
+        }
+        return names
+    }
+
+    /// Saves a category the user named and returns the name to use: an existing category with the
+    /// same name in any case is reused. Nil for an empty name or "All", which isn't a category.
+    @discardableResult
+    func addCategory(_ name: String) -> String? {
+        let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxCategoryLength))
+        guard !trimmed.isEmpty, trimmed.caseInsensitiveCompare(Account.defaultCategory) != .orderedSame else { return nil }
+        if let existing = (Account.categories + customCategories).first(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            return existing
+        }
+        customCategories.append(trimmed)
+        defaults.set(customCategories, forKey: Keys.customCategories)
+        return trimmed
     }
 
     /// Call whenever the vault password is entered (setup, unlock, change, restore).

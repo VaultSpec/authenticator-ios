@@ -19,6 +19,7 @@ nonisolated struct Account: Identifiable, Codable, Hashable, Sendable {
     var category: String = Account.defaultCategory
     var createdAt = Date()
 
+    /// The home screen's "everything" filter; an account saved with it has no category of its own.
     static let defaultCategory = "All"
     static let categories = ["All", "Personal", "Work", "Social"]
 

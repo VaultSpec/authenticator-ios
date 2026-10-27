@@ -124,7 +124,7 @@ struct HomeView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             GlassEffectContainer(spacing: 8) {
                 HStack(spacing: 8) {
-                    ForEach(Account.categories, id: \.self) { name in
+                    ForEach(settings.categories(for: vault.accounts), id: \.self) { name in
                         let selected = name == category
                         Button {
                             withAnimation(.smooth) { category = name }
