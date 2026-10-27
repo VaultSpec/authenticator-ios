@@ -527,7 +527,7 @@ struct ScanToConnectView: View {
     // The camera behind a dimmed screen with a round window, ringed by the orbiting particles
     private var viewfinder: some View {
         GeometryReader { proxy in
-            let hole = min(proxy.size.width - 64, 300)
+            let hole = max(0, min(proxy.size.width - 64, 300))
             ZStack {
                 Color.black
                 if cameraAllowed {

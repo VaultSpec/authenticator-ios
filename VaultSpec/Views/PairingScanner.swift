@@ -35,11 +35,14 @@ struct PairingScanner: UIViewRepresentable {
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
     }
 
+    /// Not main-actor isolated (the project's default): AVFoundation calls `captureOutput` on a
+    /// background queue, and a main-actor method called there traps at runtime.
+    ///
     /// Three queues, so nothing waits on anything else: the session is started and stopped on
     /// `sessionQueue`, frames arrive on `frameQueue` and are only copied there, and the slow decoding
     /// runs on `decodeQueue`, which takes the newest frame whenever it's free. (Stopping the session
     /// from the frame callback itself deadlocks: stopRunning waits for that very callback.)
-    final class Coordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
+    nonisolated final class Coordinator: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
         private let onToken: (String) -> Void
         private let session = AVCaptureSession()
         private let sessionQueue = DispatchQueue(label: "vaultspec.pairing-scanner.session")
@@ -51,7 +54,7 @@ struct PairingScanner: UIViewRepresentable {
 
         init(onToken: @escaping (String) -> Void) { self.onToken = onToken }
 
-        func start(on view: PreviewView) {
+        @MainActor func start(on view: PreviewView) {
             view.previewLayer.session = session
             switch AVCaptureDevice.authorizationStatus(for: .video) {
             case .authorized:
@@ -117,7 +120,7 @@ struct PairingScanner: UIViewRepresentable {
                 lock.unlock()
                 guard first, let token else { return }
                 stop()
-                DispatchQueue.main.async { self.onToken(token) }
+                Task { @MainActor in self.onToken(token) }
             }
         }
     }
