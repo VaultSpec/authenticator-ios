@@ -5,8 +5,6 @@ import sys
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-RAW = sys.argv[1]   # folder with the simulator captures
-OUT = sys.argv[2]   # output folder
 SS = 2              # supersampling for clean edges
 FONTS = "/Volumes/Projects/Orgs/vaultspec/vaultspec-pass/FE/android/app/src/main/res/font"
 
@@ -271,71 +269,81 @@ def shot(name):
     return Image.open(f"{RAW}/{name}.png")
 
 
-# ─── iPhone 6.9" (1320 × 2868) ───────────────────────────────────────────────
-
-PW, PH = 1320, 2868
+RAW = sys.argv[1] if len(sys.argv) > 1 else "."
+OUT = sys.argv[2] if len(sys.argv) > 2 else "."
 GREEN, AMBER, VIOLET = (52, 211, 153), (255, 176, 32), (167, 139, 250)
 
 
-def phone_canvas(glow=(0.5, 0.64)):
-    return backdrop(PW * SS, PH * SS, glow)
+def main():
+    # ─── iPhone 6.9" (1320 × 2868) ───────────────────────────────────────────────
+
+    PW, PH = 1320, 2868
+    GREEN, AMBER, VIOLET = (52, 211, 153), (255, 176, 32), (167, 139, 250)
 
 
-c = phone_canvas()
-text_block(c, "VaultSpec Authenticator", "Two-factor codes,\nbuilt for work.", "Encrypted on this device. Synced only if you choose.", 150)
-badges(c, [("AES-256-GCM", GREEN), ("Face ID", BLUE), ("Works offline", VIOLET)], 690)
-place(c, shot("iphone-codes"), "phone", 660, 1810, 1880, yaw=-20, pitch=7, roll=-3)
-finish(c, "iphone-01-codes", (PW, PH))
-
-c = phone_canvas((0.5, 0.66))
-text_block(c, "Security controls", "Locked down\nby default.", "Screenshot blocking, tap to reveal\nand password reminders.", 150)
-badges(c, [("Blocks screenshots", GREEN), ("Auto-lock", AMBER)], 740)
-place(c, shot("iphone-settings"), "phone", 660, 1850, 1840, yaw=18, pitch=7, roll=3)
-finish(c, "iphone-02-security", (PW, PH))
-
-c = phone_canvas()
-text_block(c, "Setup in seconds", "Add any service\nin seconds.", "Scan a QR code or paste a setup link.\nSHA-1, SHA-256 and SHA-512.", 150)
-badges(c, [("QR or setup link", BLUE), ("6 or 8 digits", VIOLET)], 740)
-place(c, shot("iphone-add"), "phone", 660, 1850, 1840, yaw=-16, pitch=6, roll=-2)
-finish(c, "iphone-03-add", (PW, PH))
-
-c = phone_canvas((0.5, 0.72))
-text_block(c, "Zero knowledge", "One password.\nZero exposure.", "Your vault is sealed with AES-256\nand only opens on your device.", 150)
-badges(c, [("Keychain protected", GREEN), ("No tracking", AMBER)], 740)
-place(c, shot("iphone-lock"), "phone", 660, 2440, 2300, yaw=-12, pitch=16, roll=-2)
-finish(c, "iphone-04-lock", (PW, PH))
-
-c = phone_canvas((0.55, 0.62))
-text_block(c, "iPhone · iPad · Mac", "One vault on\nevery device.", "Encrypted cloud backup restores your\ncodes on any iPhone, iPad or Mac.", 150)
-badges(c, [("End-to-end encrypted backup", GREEN)], 740)
-place(c, shot("ipad-codes"), "ipad", 560, 1640, 1420, yaw=22, pitch=6, roll=2, depth=0.035)
-place(c, shot("iphone-codes"), "phone", 930, 1980, 1380, yaw=-20, pitch=7, roll=-3, glow=False)
-finish(c, "iphone-05-devices", (PW, PH))
-
-# ─── iPad 13" (2064 × 2752) ──────────────────────────────────────────────────
-
-IW, IH = 2064, 2752
+    def phone_canvas(glow=(0.5, 0.64)):
+        return backdrop(PW * SS, PH * SS, glow)
 
 
-def ipad_canvas(glow=(0.5, 0.64)):
-    return backdrop(IW * SS, IH * SS, glow)
+    c = phone_canvas()
+    text_block(c, "VaultSpec Authenticator", "Two-factor codes,\nbuilt for work.", "Encrypted on this device. Synced only if you choose.", 150)
+    badges(c, [("AES-256-GCM", GREEN), ("Face ID", BLUE), ("Works offline", VIOLET)], 690)
+    place(c, shot("iphone-codes"), "phone", 660, 1810, 1880, yaw=-20, pitch=7, roll=-3)
+    finish(c, "iphone-01-codes", (PW, PH))
+
+    c = phone_canvas((0.5, 0.66))
+    text_block(c, "Security controls", "Locked down\nby default.", "Screenshot blocking, tap to reveal\nand password reminders.", 150)
+    badges(c, [("Blocks screenshots", GREEN), ("Auto-lock", AMBER)], 740)
+    place(c, shot("iphone-settings"), "phone", 660, 1850, 1840, yaw=18, pitch=7, roll=3)
+    finish(c, "iphone-02-security", (PW, PH))
+
+    c = phone_canvas()
+    text_block(c, "Setup in seconds", "Add any service\nin seconds.", "Scan a QR code or paste a setup link.\nSHA-1, SHA-256 and SHA-512.", 150)
+    badges(c, [("QR or setup link", BLUE), ("6 or 8 digits", VIOLET)], 740)
+    place(c, shot("iphone-add"), "phone", 660, 1850, 1840, yaw=-16, pitch=6, roll=-2)
+    finish(c, "iphone-03-add", (PW, PH))
+
+    c = phone_canvas((0.5, 0.72))
+    text_block(c, "Zero knowledge", "One password.\nZero exposure.", "Your vault is sealed with AES-256\nand only opens on your device.", 150)
+    badges(c, [("Keychain protected", GREEN), ("No tracking", AMBER)], 740)
+    place(c, shot("iphone-lock"), "phone", 660, 2440, 2300, yaw=-12, pitch=16, roll=-2)
+    finish(c, "iphone-04-lock", (PW, PH))
+
+    c = phone_canvas((0.55, 0.62))
+    text_block(c, "iPhone · iPad · Mac", "One vault on\nevery device.", "Encrypted cloud backup restores your\ncodes on any iPhone, iPad or Mac.", 150)
+    badges(c, [("End-to-end encrypted backup", GREEN)], 740)
+    place(c, shot("ipad-codes"), "ipad", 560, 1640, 1420, yaw=22, pitch=6, roll=2, depth=0.035)
+    place(c, shot("iphone-codes"), "phone", 930, 1980, 1380, yaw=-20, pitch=7, roll=-3, glow=False)
+    finish(c, "iphone-05-devices", (PW, PH))
+
+    # ─── iPad 13" (2064 × 2752) ──────────────────────────────────────────────────
+
+    IW, IH = 2064, 2752
 
 
-c = ipad_canvas()
-text_block(c, "VaultSpec Authenticator", "Every 2FA code.\nOne secure grid.", "Encrypted on this device. Synced only if you choose.", 140, scale=1.2)
-badges(c, [("AES-256-GCM", GREEN), ("Face ID and Touch ID", BLUE), ("Works offline", VIOLET)], 720, scale=1.2)
-place(c, shot("ipad-codes"), "ipad", 1032, 1780, 1740, yaw=-16, pitch=7, roll=-2, depth=0.035)
-finish(c, "ipad-01-codes", (IW, IH))
+    def ipad_canvas(glow=(0.5, 0.64)):
+        return backdrop(IW * SS, IH * SS, glow)
 
-c = ipad_canvas()
-text_block(c, "Security controls", "Locked down\nby default.", "Screenshot blocking, tap to reveal and password reminders.", 140, scale=1.2)
-badges(c, [("Blocks screenshots", GREEN), ("Auto-lock", AMBER)], 720, scale=1.2)
-place(c, shot("ipad-settings"), "ipad", 1032, 1780, 1740, yaw=16, pitch=7, roll=2, depth=0.035)
-finish(c, "ipad-02-security", (IW, IH))
 
-c = ipad_canvas((0.55, 0.64))
-text_block(c, "iPhone · iPad · Mac", "One vault on\nevery device.", "Encrypted cloud backup restores your codes on any iPhone, iPad or Mac.", 140, scale=1.2)
-badges(c, [("End-to-end encrypted backup", GREEN)], 720, scale=1.2)
-place(c, shot("ipad-codes"), "ipad", 900, 1740, 1620, yaw=20, pitch=6, roll=2, depth=0.035)
-place(c, shot("iphone-codes"), "phone", 1560, 1990, 1250, yaw=-20, pitch=7, roll=-3, glow=False)
-finish(c, "ipad-03-devices", (IW, IH))
+    c = ipad_canvas()
+    text_block(c, "VaultSpec Authenticator", "Every 2FA code.\nOne secure grid.", "Encrypted on this device. Synced only if you choose.", 140, scale=1.2)
+    badges(c, [("AES-256-GCM", GREEN), ("Face ID and Touch ID", BLUE), ("Works offline", VIOLET)], 720, scale=1.2)
+    place(c, shot("ipad-codes"), "ipad", 1032, 1780, 1740, yaw=-16, pitch=7, roll=-2, depth=0.035)
+    finish(c, "ipad-01-codes", (IW, IH))
+
+    c = ipad_canvas()
+    text_block(c, "Security controls", "Locked down\nby default.", "Screenshot blocking, tap to reveal and password reminders.", 140, scale=1.2)
+    badges(c, [("Blocks screenshots", GREEN), ("Auto-lock", AMBER)], 720, scale=1.2)
+    place(c, shot("ipad-settings"), "ipad", 1032, 1780, 1740, yaw=16, pitch=7, roll=2, depth=0.035)
+    finish(c, "ipad-02-security", (IW, IH))
+
+    c = ipad_canvas((0.55, 0.64))
+    text_block(c, "iPhone · iPad · Mac", "One vault on\nevery device.", "Encrypted cloud backup restores your codes on any iPhone, iPad or Mac.", 140, scale=1.2)
+    badges(c, [("End-to-end encrypted backup", GREEN)], 720, scale=1.2)
+    place(c, shot("ipad-codes"), "ipad", 900, 1740, 1620, yaw=20, pitch=6, roll=2, depth=0.035)
+    place(c, shot("iphone-codes"), "phone", 1560, 1990, 1250, yaw=-20, pitch=7, roll=-3, glow=False)
+    finish(c, "ipad-03-devices", (IW, IH))
+
+
+if __name__ == "__main__":
+    main()
