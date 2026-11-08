@@ -63,7 +63,7 @@ final class CloudStore {
     }
 
     func verify(email: String, password: String, code: String) async throws {
-        let session = try await api.verify(email: email, password: password, code: code, deviceName: UIDevice.current.name)
+        let session = try await api.verify(email: email, password: password, code: code)
         self.email = session.email
     }
 
@@ -197,7 +197,7 @@ final class CloudStore {
     /// The new device: claims a scanned code. Signs in to the other device's account and returns its vault.
     func claimPairing(code: String) async throws -> BackupPayload {
         let token = String(code.dropFirst(Self.pairingPrefix.count))
-        let json = try await api.claimPairing(token: token, deviceName: UIDevice.current.name)
+        let json = try await api.claimPairing(token: token)
         email = await api.email
         guard let payload = try? JSONDecoder().decode(BackupPayload.self, from: Data(json.utf8)) else {
             throw BackupFormat.FormatError.unreadable

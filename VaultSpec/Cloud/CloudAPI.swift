@@ -73,10 +73,10 @@ actor CloudAPI {
 
     /// Sign-in step 2: exchanges the password and the emailed code for a session.
     @discardableResult
-    func verify(email: String, password: String, code: String, deviceName: String) async throws -> Session {
+    func verify(email: String, password: String, code: String) async throws -> Session {
         struct Response: Decodable { let email: String?; let accessToken: String; let refreshToken: String }
         let data = try await send("POST", "/v1/auth/login/verify", body: [
-            "email": email, "password": password, "code": code, "deviceName": deviceName,
+            "email": email, "password": password, "code": code,
         ])
         let response = try decode(Response.self, data)
         let session = Session(email: response.email ?? email, accessToken: response.accessToken, refreshToken: response.refreshToken)
@@ -146,9 +146,9 @@ actor CloudAPI {
     }
 
     /// The new device: claims the scanned token, signs in to the same account and returns the snapshot.
-    func claimPairing(token: String, deviceName: String) async throws -> String {
+    func claimPairing(token: String) async throws -> String {
         struct Response: Decodable { let email: String; let payload: String; let accessToken: String; let refreshToken: String }
-        let response = try decode(Response.self, try await send("POST", "/v1/pairing/claim", body: ["token": token, "deviceName": deviceName]))
+        let response = try decode(Response.self, try await send("POST", "/v1/pairing/claim", body: ["token": token]))
         store(Session(email: response.email, accessToken: response.accessToken, refreshToken: response.refreshToken))
         return response.payload
     }
